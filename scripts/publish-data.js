@@ -24,11 +24,13 @@ const admin = require('firebase-admin');
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
+const os = require('os');
 
 // --- Configuration ---
 const DRY_RUN = process.argv.includes('--dry-run');
 const BRANCH = 'gh-pages';
-const OUTPUT_DIR = path.join(__dirname, '..', '.gh-pages-data');
+// Use OS temp directory to avoid git conflicts
+const OUTPUT_DIR = path.join(os.tmpdir(), 'pamiri-gh-pages-data');
 
 // --- Initialize Firebase Admin ---
 const serviceAccountPath = path.join(__dirname, 'serviceAccountKey.json');
