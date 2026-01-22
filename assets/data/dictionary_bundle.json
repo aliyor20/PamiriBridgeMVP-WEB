@@ -1,0 +1,8 @@
+{
+    "version": "20260109",
+    "exportTimestamp": 1736474400,
+    "exportDate": "2026-01-09T00:00:00.000Z",
+    "entryCount": 0,
+    "entries": [],
+    "note": "This is a placeholder. Run 'node scripts/exportFirestoreToBundle.js' to populate with real data."
+}

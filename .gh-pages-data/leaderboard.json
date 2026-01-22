@@ -1,0 +1,108 @@
+{
+  "version": 1769063216,
+  "updated_at": "2026-01-22T06:26:56.099Z",
+  "users": [
+    {
+      "id": "PHVMRUX1oMefZJ2j3gBt3A33a532",
+      "displayName": "bunafsha",
+      "points": 24,
+      "valley_affiliation": "unknown"
+    },
+    {
+      "id": "xS2qLmDYtWdm075dhQXXwa4Rfha2",
+      "displayName": "aliyoradmin",
+      "points": 14,
+      "valley_affiliation": "shughnan"
+    },
+    {
+      "id": "OqvfibLdN5fUtlA5Tj2hVM90NTA2",
+      "displayName": "MountainVoice",
+      "points": 11,
+      "valley_affiliation": "unknown"
+    },
+    {
+      "id": "VlUm3FhWclff7S48K3jLiCm6Ml02",
+      "displayName": "Nigger",
+      "points": 4,
+      "valley_affiliation": "unknown"
+    },
+    {
+      "id": "XFuJAdROQteoaTW8wcsICS3BMAt1",
+      "displayName": "Contributor",
+      "points": 1,
+      "valley_affiliation": "shughnan"
+    },
+    {
+      "id": "0HcK8WGQZWa3IlRn2akkT9ZGOrr1",
+      "displayName": "MountainVoice",
+      "points": 1,
+      "valley_affiliation": "unknown"
+    },
+    {
+      "id": "o0LaUHcGRObmGKgn4RpKblb9rtN2",
+      "displayName": "MountainVoice",
+      "points": 0,
+      "valley_affiliation": "unknown"
+    },
+    {
+      "id": "jbUMb58fHyZWvTMgHHudbVEwT9i2",
+      "displayName": "Contributor",
+      "points": 0,
+      "valley_affiliation": "shughnan"
+    },
+    {
+      "id": "asQBZfaDGCYNRS9HhmUxj57yfrs1",
+      "displayName": "aliyor225",
+      "points": 0,
+      "valley_affiliation": "unknown"
+    },
+    {
+      "id": "ZIGI8sX48xfktvt7lm5rHw1vnXG3",
+      "displayName": "Contributor",
+      "points": 0,
+      "valley_affiliation": "unknown"
+    },
+    {
+      "id": "TFvHDFcGRkTGR6puEH98Nwdnc1E3",
+      "displayName": "aliyor",
+      "points": 0,
+      "valley_affiliation": "unknown"
+    },
+    {
+      "id": "NJC7FkXQQ8cqOq5Eeqx0j5I4QJQ2",
+      "displayName": "PamiriPrideguy",
+      "points": 0,
+      "valley_affiliation": "unknown"
+    }
+  ],
+  "valley_stats": {
+    "shughnan": {
+      "count": 3,
+      "points": 15
+    },
+    "rushan": {
+      "count": 0,
+      "points": 0
+    },
+    "wakhan": {
+      "count": 0,
+      "points": 0
+    },
+    "bartang": {
+      "count": 0,
+      "points": 0
+    },
+    "yazghulami": {
+      "count": 0,
+      "points": 0
+    },
+    "ishkashim": {
+      "count": 0,
+      "points": 0
+    },
+    "sarikol": {
+      "count": 0,
+      "points": 0
+    }
+  }
+}
