@@ -16,7 +16,7 @@
   },
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",
-    "@lottiefiles/dotlottie-react": "^0.17.12",
+    "@lottiefiles/dotlottie-react": "^0.13.5",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-navigation/bottom-tabs": "^7.9.0",
     "@react-navigation/material-top-tabs": "^7.4.13",
