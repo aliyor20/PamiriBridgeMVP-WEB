@@ -2,11 +2,15 @@
   "name": "pamirilexiconmvp",
   "version": "1.0.0",
   "main": "index.js",
+  "homepage": "https://aliyor20.github.io/PamiriLexiconMVP",
   "scripts": {
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
+    "build": "npx expo export -p web",
+    "predeploy": "expo export -p web",
+    "deploy": "gh-pages -d dist",
     "publish-data": "node scripts/publish-data.js",
     "publish-data:dry": "node scripts/publish-data.js --dry-run"
   },
@@ -15,6 +19,7 @@
     "@lottiefiles/dotlottie-react": "^0.17.12",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-navigation/bottom-tabs": "^7.9.0",
+    "@react-navigation/material-top-tabs": "^7.4.13",
     "@react-navigation/native": "^7.1.26",
     "@react-navigation/stack": "^7.6.13",
     "@siteed/expo-audio-studio": "^2.18.1",
@@ -37,17 +42,20 @@
     "react-dom": "19.1.0",
     "react-native": "0.81.5",
     "react-native-gesture-handler": "~2.28.0",
+    "react-native-pager-view": "^8.0.0",
     "react-native-reanimated": "~4.1.1",
     "react-native-safe-area-context": "~5.6.0",
     "react-native-screens": "~4.16.0",
     "react-native-svg": "^15.12.1",
+    "react-native-tab-view": "^4.2.2",
     "react-native-web": "^0.21.0",
-    "react-native-worklets": "^0.5.1",
+    "react-native-worklets": "^0.5.2",
     "react-native-worklets-core": "^1.6.2"
   },
   "private": true,
   "devDependencies": {
     "firebase-admin": "^13.6.0",
+    "gh-pages": "^6.3.0",
     "react-native-svg-transformer": "^1.5.2"
   }
 }
