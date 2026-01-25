@@ -23,7 +23,7 @@ import Animated, {
     runOnJS,
 } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, setDoc } from 'firebase/firestore';
 import { db, auth } from '../firebaseConfig';
 import { usePreferences } from '../context/PreferencesContext';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -35,6 +35,7 @@ import MapSlide from '../components/onboarding/MapSlide';
 import DialectSelectSlide from '../components/onboarding/DialectSelectSlide';
 import UsernameSlide from '../components/onboarding/UsernameSlide';
 import FeaturesSlide from '../components/onboarding/FeaturesSlide';
+import ActionModal from '../components/ActionModal';
 
 const { width, height } = Dimensions.get('window');
 const SLIDE_COUNT = 6;
@@ -89,17 +90,47 @@ export default function OnboardingScreen({ navigation }) {
         goToSlide(3);
     };
 
+    const [modal, setModal] = useState({
+        visible: false,
+        type: 'info',
+        title: '',
+        message: '',
+        onAction: () => { },
+    });
+
+    const showModal = (config) => {
+        setModal({ ...config, visible: true });
+    };
+
+    const hideModal = () => {
+        setModal(prev => ({ ...prev, visible: false }));
+    };
+
     const handleComplete = async () => {
         // Validate required fields
         if (!selectedDialect) {
-            Alert.alert('Select a Dialect', 'Please choose your preferred dialect before continuing.');
-            goToSlide(3);
+            showModal({
+                type: 'info',
+                title: 'Select a Dialect',
+                message: 'Please choose your preferred dialect before continuing.',
+                onPrimaryAction: () => {
+                    hideModal();
+                    goToSlide(3);
+                }
+            });
             return;
         }
 
         if (username.length < 3) {
-            Alert.alert('Choose a Username', 'Please enter a username (minimum 3 characters).');
-            goToSlide(4);
+            showModal({
+                type: 'info',
+                title: 'Choose a Username',
+                message: 'Please enter a username (minimum 3 characters).',
+                onPrimaryAction: () => {
+                    hideModal();
+                    goToSlide(4);
+                }
+            });
             return;
         }
 
@@ -110,11 +141,13 @@ export default function OnboardingScreen({ navigation }) {
             const user = auth.currentUser;
             if (user) {
                 const userRef = doc(db, 'users', user.uid);
-                await updateDoc(userRef, {
+                await setDoc(userRef, {
                     displayName: username.trim(),
+                    status: 'Pioneer',  // Default rank (will auto-upgrade to Guide at 10 verified entries)
                     onboardingComplete: true,
-                });
+                }, { merge: true });
             }
+
 
             navigation.reset({
                 index: 0,
@@ -122,7 +155,12 @@ export default function OnboardingScreen({ navigation }) {
             });
         } catch (error) {
             console.error('Error completing onboarding:', error);
-            Alert.alert('Error', 'Something went wrong. Please try again.');
+            showModal({
+                type: 'error',
+                title: 'Error',
+                message: 'Something went wrong. Please try again.',
+                onPrimaryAction: hideModal
+            });
         } finally {
             setIsCompleting(false);
         }
@@ -216,6 +254,16 @@ export default function OnboardingScreen({ navigation }) {
                     )}
                 </TouchableOpacity>
             </Animated.View>
+
+            <ActionModal
+                visible={modal.visible}
+                type={modal.type}
+                title={modal.title}
+                message={modal.message}
+                primaryActionLabel={modal.primaryActionLabel}
+                onPrimaryAction={modal.onAction || modal.onPrimaryAction || hideModal}
+                onDismiss={hideModal}
+            />
         </View>
     );
 }

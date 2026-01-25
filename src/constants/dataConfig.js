@@ -33,3 +33,5 @@ export const CACHE_CONFIG = {
         LAST_CHECK: 'gh_pages_last_check',
     }
 };
+
+export const DIALECTS = ["All", "Shughni", "Rushani", "Wakhi", "Yazghulami", "Sarikoli", "Bartangi", "Ishkashimi"];

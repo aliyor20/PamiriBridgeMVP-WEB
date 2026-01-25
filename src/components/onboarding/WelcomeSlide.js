@@ -3,7 +3,7 @@
  * Logo + Typewriter animated title + Cycling subtitle with fade animation
  */
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Dimensions, Platform } from 'react-native';
 import Animated, {
     useSharedValue,
     useAnimatedStyle,
@@ -104,11 +104,26 @@ export default function WelcomeSlide({ isActive }) {
             <View style={styles.topContent}>
                 {/* Logo - at top, slightly bigger */}
                 <Animated.View style={[styles.logoContainer, logoAnimatedStyle]}>
-                    <SvgXml
-                        xml={themedLogoSvg}
-                        width={400}
-                        height={400}
-                    />
+                    {Platform.OS === 'web' ? (
+                        <div
+                            style={{
+                                width: 280,
+                                height: 280,
+                                maxWidth: '80vw',
+                                overflow: 'hidden',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                            }}
+                            dangerouslySetInnerHTML={{ __html: themedLogoSvg }}
+                        />
+                    ) : (
+                        <SvgXml
+                            xml={themedLogoSvg}
+                            width={400}
+                            height={400}
+                        />
+                    )}
                 </Animated.View>
 
                 {/* Title below logo - with typewriter effect */}

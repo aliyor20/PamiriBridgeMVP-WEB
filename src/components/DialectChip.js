@@ -1,20 +1,26 @@
 import React from 'react';
 import { TouchableOpacity, Text, StyleSheet } from 'react-native';
-import { COLORS, SPACING, LAYOUT } from '../constants/theme';
+import { SPACING } from '../constants/theme';
+import { usePreferences } from '../context/PreferencesContext';
 
 export default function DialectChip({ label, selected, onPress }) {
+    const { colors } = usePreferences();
+
     return (
         <TouchableOpacity
             style={[
                 styles.chip,
-                selected && styles.chipSelected
+                {
+                    backgroundColor: selected ? colors.primary : colors.surface,
+                    borderColor: selected ? colors.primary : colors.border
+                }
             ]}
             onPress={onPress}
             activeOpacity={0.7}
         >
             <Text style={[
                 styles.text,
-                selected && styles.textSelected
+                { color: selected ? colors.surface : colors.text }
             ]}>
                 {label}
             </Text>
@@ -27,22 +33,11 @@ const styles = StyleSheet.create({
         paddingHorizontal: SPACING.m,
         paddingVertical: SPACING.s,
         borderRadius: 20,
-        backgroundColor: COLORS.surface,
         borderWidth: 1,
-        borderColor: COLORS.border,
         marginRight: SPACING.s,
-    },
-    chipSelected: {
-        backgroundColor: COLORS.primary,
-        borderColor: COLORS.primary,
     },
     text: {
         fontSize: 14,
-        color: COLORS.text,
         fontWeight: '500',
-    },
-    textSelected: {
-        color: COLORS.surface,
-        fontWeight: '600',
     }
 });

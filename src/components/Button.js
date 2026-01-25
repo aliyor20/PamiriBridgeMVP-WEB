@@ -1,7 +1,8 @@
 import React from 'react';
 import { TouchableOpacity, Text, ActivityIndicator, StyleSheet } from 'react-native';
-import { COLORS, SPACING, LAYOUT, SHADOWS } from '../constants/theme';
+import { SPACING, LAYOUT, SHADOWS } from '../constants/theme';
 import { Ionicons } from '@expo/vector-icons';
+import { usePreferences } from '../context/PreferencesContext';
 
 export default function Button({
     title,
@@ -13,18 +14,20 @@ export default function Button({
     disabled = false,
     style
 }) {
+    const { colors } = usePreferences();
+
     const getBackgroundColor = () => {
-        if (disabled) return COLORS.border;
-        if (variant === 'primary') return COLORS.primary;
-        if (variant === 'secondary') return COLORS.secondary;
-        if (variant === 'danger') return COLORS.error;
+        if (disabled) return colors.border;
+        if (variant === 'primary') return colors.primary;
+        if (variant === 'secondary') return colors.secondary;
+        if (variant === 'danger') return colors.error;
         return 'transparent';
     };
 
     const getTextColor = () => {
-        if (disabled) return COLORS.textLight;
-        if (variant === 'ghost') return COLORS.primary;
-        return COLORS.surface;
+        if (disabled) return colors.textLight;
+        if (variant === 'ghost') return colors.primary;
+        return colors.surface;
     };
 
     const btnStyle = [

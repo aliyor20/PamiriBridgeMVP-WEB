@@ -331,8 +331,9 @@ const syncDictionaryInternal = async () => {
     }
 
     // STEP 4: Sync if newer version available
-    if (remoteVersion > localVersion) {
-        console.log(`New version available: ${remoteVersion} > ${localVersion}`);
+    // FORCE SYNC if we have no local data but we do have a remote version (handles Web/Storage mismatches)
+    if (remoteVersion > localVersion || currentLocalCount === 0) {
+        console.log(`New version available or local DB empty: ${remoteVersion} > ${localVersion} (count: ${currentLocalCount})`);
         return await syncFromGitHubPages();
     }
 

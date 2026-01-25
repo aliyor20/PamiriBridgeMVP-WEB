@@ -23,6 +23,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, TYPOGRAPHY } from '../constants/theme';
 import Button from '../components/Button';
 import Input from '../components/Input';
+import ActionModal from '../components/ActionModal';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -43,13 +44,32 @@ export default function LoginScreen() {
         redirectUri: "https://auth.expo.io/@anonymous/PamiriLexiconMVP-7c2c737a-c51e-7b68-fdff-a12838128212",
     });
 
+    const [modal, setModal] = useState({
+        visible: false,
+        type: 'info',
+        title: '',
+        message: '',
+        onAction: () => { },
+    });
+
+    const showModal = (config) => {
+        setModal({ ...config, visible: true });
+    };
+
+    const hideModal = () => {
+        setModal(prev => ({ ...prev, visible: false }));
+    };
+
     useEffect(() => {
         if (response?.type === 'success') {
             // Note: In a real app, you'd use GoogleAuthProvider.credential to sign in to Firebase
-            // For this MVP snippet, we acknowledge the token but we might need more logic to actually 
-            // sign in to Firebase with the Google credential if that's the intention.
-            // The original code just alerted. I'll leave it as alert but structured.
-            Alert.alert("Google Sign-In", "Google Sign-In successful. (Firebase integration required)");
+            // For this MVP snippet, we acknowledge the token but we might need more logic
+            showModal({
+                type: 'success',
+                title: 'Google Sign-In',
+                message: 'Google Sign-In successful. (Firebase integration required)',
+                onPrimaryAction: hideModal
+            });
         }
     }, [response]);
 
@@ -65,6 +85,7 @@ export default function LoginScreen() {
                     points: 0,
                     badges: [],
                     isAdmin: false,
+                    status: 'Pioneer',  // Default rank for new users
                     joined: serverTimestamp(),
                 });
             }
@@ -75,7 +96,12 @@ export default function LoginScreen() {
 
     const handleAuth = async () => {
         if (!email || !password) {
-            Alert.alert('Validation Error', 'Please enter both email and password.');
+            showModal({
+                type: 'error',
+                title: 'Validation Error',
+                message: 'Please enter both email and password.',
+                onPrimaryAction: hideModal
+            });
             return;
         }
 
@@ -94,7 +120,12 @@ export default function LoginScreen() {
             else if (error.code === 'auth/invalid-email') errorMessage = "Please enter a valid email address.";
             else if (error.code === 'auth/invalid-credential') errorMessage = "Invalid email or password.";
 
-            Alert.alert('Authentication Error', errorMessage);
+            showModal({
+                type: 'error',
+                title: 'Authentication Error',
+                message: errorMessage,
+                onPrimaryAction: hideModal
+            });
         } finally {
             setLoading(false);
         }
@@ -166,6 +197,16 @@ export default function LoginScreen() {
                     />
                 </View>
             </KeyboardAvoidingView>
+
+            <ActionModal
+                visible={modal.visible}
+                type={modal.type}
+                title={modal.title}
+                message={modal.message}
+                primaryActionLabel={modal.primaryActionLabel}
+                onPrimaryAction={modal.onAction || modal.onPrimaryAction || hideModal}
+                onDismiss={hideModal}
+            />
         </SafeAreaView>
     );
 }

@@ -11,7 +11,9 @@ import { usePreferences } from '../context/PreferencesContext';
 import ThemePicker from '../components/ThemePicker';
 import { auth } from '../firebaseConfig';
 
-const DIALECTS = ["All", "Shughni", "Rushani", "Wakhi", "Yazghulami", "Sarikoli", "Bartangi", "Ishkashimi"];
+import { DIALECTS } from '../constants/dataConfig';
+
+import ActionModal from '../components/ActionModal';
 
 export default function SettingsScreen() {
     const navigation = useNavigation();
@@ -22,6 +24,23 @@ export default function SettingsScreen() {
     } = usePreferences();
 
     const [clearingCache, setClearingCache] = useState(false);
+
+    // --- MODAL STATE ---
+    const [modal, setModal] = useState({
+        visible: false,
+        type: 'info',
+        title: '',
+        message: '',
+        onAction: () => { },
+    });
+
+    const showModal = (config) => {
+        setModal({ ...config, visible: true });
+    };
+
+    const hideModal = () => {
+        setModal(prev => ({ ...prev, visible: false }));
+    };
 
     const SectionHeader = ({ title }) => (
         <Text style={[styles.sectionHeader, { color: colors.textLight }]}>{title}</Text>
@@ -75,33 +94,45 @@ export default function SettingsScreen() {
     );
 
     const handleClearCache = async () => {
-        Alert.alert(
-            "Clear Audio Cache",
-            "This will delete all cached audio files. They will be re-downloaded when you play them again.",
-            [
-                { text: "Cancel", style: "cancel" },
-                {
-                    text: "Clear",
-                    style: "destructive",
-                    onPress: async () => {
-                        setClearingCache(true);
-                        try {
-                            const audioDir = FileSystem.documentDirectory + 'audio/';
-                            const dirInfo = await FileSystem.getInfoAsync(audioDir);
-                            if (dirInfo.exists) {
-                                await FileSystem.deleteAsync(audioDir, { idempotent: true });
-                            }
-                            Alert.alert("Success", "Audio cache cleared successfully.");
-                        } catch (error) {
-                            console.error("Clear cache error:", error);
-                            Alert.alert("Error", "Failed to clear cache.");
-                        } finally {
-                            setClearingCache(false);
-                        }
+        showModal({
+            type: 'confirm',
+            title: 'Clear Audio Cache',
+            message: 'This will delete all cached audio files. They will be re-downloaded when you play them again.',
+            primaryActionLabel: 'Clear',
+            secondaryActionLabel: 'Cancel',
+            onSecondaryAction: hideModal,
+            onPrimaryAction: async () => {
+                hideModal();
+                setClearingCache(true);
+                try {
+                    const audioDir = FileSystem.documentDirectory + 'audio/';
+                    const dirInfo = await FileSystem.getInfoAsync(audioDir);
+                    if (dirInfo.exists) {
+                        await FileSystem.deleteAsync(audioDir, { idempotent: true });
                     }
+                    setTimeout(() => {
+                        showModal({
+                            type: 'success',
+                            title: 'Success',
+                            message: 'Audio cache cleared successfully.',
+                            onPrimaryAction: hideModal
+                        });
+                    }, 500);
+                } catch (error) {
+                    console.error("Clear cache error:", error);
+                    setTimeout(() => {
+                        showModal({
+                            type: 'error',
+                            title: 'Error',
+                            message: 'Failed to clear cache.',
+                            onPrimaryAction: hideModal
+                        });
+                    }, 500);
+                } finally {
+                    setClearingCache(false);
                 }
-            ]
-        );
+            }
+        });
     };
 
     // Audio is always compressed to 32kbps AAC per Firebase Spark Plan specs
@@ -196,18 +227,18 @@ export default function SettingsScreen() {
                         label="Sign Out"
                         icon="log-out-outline"
                         onPress={() => {
-                            Alert.alert(
-                                "Sign Out",
-                                "Are you sure you want to sign out?",
-                                [
-                                    { text: "Cancel", style: "cancel" },
-                                    {
-                                        text: "Sign Out",
-                                        style: "destructive",
-                                        onPress: () => auth.signOut()
-                                    }
-                                ]
-                            );
+                            showModal({
+                                type: 'confirm',
+                                title: 'Sign Out',
+                                message: 'Are you sure you want to sign out?',
+                                primaryActionLabel: 'Sign Out',
+                                secondaryActionLabel: 'Cancel',
+                                onSecondaryAction: hideModal,
+                                onPrimaryAction: () => {
+                                    hideModal();
+                                    auth.signOut();
+                                }
+                            });
                         }}
                         destructive
                     />
@@ -220,6 +251,18 @@ export default function SettingsScreen() {
                 </View>
 
             </ScrollView>
+
+            <ActionModal
+                visible={modal.visible}
+                type={modal.type}
+                title={modal.title}
+                message={modal.message}
+                primaryActionLabel={modal.primaryActionLabel}
+                onPrimaryAction={modal.onAction || modal.onPrimaryAction || hideModal}
+                secondaryActionLabel={modal.secondaryActionLabel}
+                onSecondaryAction={modal.onSecondaryAction}
+                onDismiss={hideModal}
+            />
         </SafeAreaView>
     );
 }

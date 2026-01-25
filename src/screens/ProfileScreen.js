@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
     View,
     Text,
@@ -9,7 +9,8 @@ import {
     TextInput,
     Dimensions,
     StatusBar,
-    ScrollView
+    ScrollView,
+    RefreshControl
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { auth, db } from '../firebaseConfig';
@@ -28,6 +29,7 @@ import Animated, {
     withSpring,
     withTiming,
     FadeInRight,
+    FadeIn,
     useDerivedValue
 } from 'react-native-reanimated';
 import { BlurView } from 'expo-blur';
@@ -35,11 +37,13 @@ import { LinearGradient } from 'expo-linear-gradient';
 
 import { SPACING, LAYOUT } from '../constants/theme';
 import { getBadgeById } from '../services/badgeService';
+import * as AudioService from '../services/AudioService';
 import { forceSyncDictionary } from '../services/SyncService';
 import { clearLocalDatabase } from '../services/Database';
 import { usePreferences } from '../context/PreferencesContext';
 import { useNavigation } from '@react-navigation/native';
 import NumberTicker from '../components/NumberTicker';
+import ShareableStatsModal from '../components/ShareableStatsModal';
 
 const { width } = Dimensions.get('window');
 const HEADER_HEIGHT_EXPANDED = 320; // Increased for better spacing
@@ -63,6 +67,8 @@ export default function ProfileScreen() {
     const [editName, setEditName] = useState('');
     const [savingName, setSavingName] = useState(false);
     const [syncing, setSyncing] = useState(false);
+    const [expandedId, setExpandedId] = useState(null);
+    const [showStatsModal, setShowStatsModal] = useState(false);
 
     // Animation Values
     const scrollY = useSharedValue(0);
@@ -104,16 +110,7 @@ export default function ProfileScreen() {
             });
             entries.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
 
-            // TEMPORARY: Dummy data for scroll testing
-            for (let i = 1; i <= 20; i++) {
-                entries.push({
-                    id: `dummy-${i}`,
-                    word: `Test Word ${i}`,
-                    dialect: ['Shughni', 'Wakhi', 'Bartangi'][i % 3],
-                    status: i % 2 === 0 ? 'verified' : 'pending',
-                    timestamp: { seconds: Date.now() / 1000 }
-                });
-            }
+
 
             setMyEntries(entries);
         } catch (error) {
@@ -130,17 +127,21 @@ export default function ProfileScreen() {
         setRefreshing(false);
     }, [user]);
 
-    const playSound = async (audioURL) => {
+    const playSound = async (audioURL, entryId) => {
         if (!audioURL) return;
         try {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             if (sound) await sound.unloadAsync();
-            const { sound: newSound } = await Audio.Sound.createAsync(
-                { uri: audioURL },
-                { shouldPlay: true }
-            );
-            setSound(newSound);
-            newSound.playAsync();
+
+            // Use standardized AudioService (handles caching)
+            const newSound = await AudioService.playAudio(audioURL, entryId);
+            if (newSound) {
+                setSound(newSound);
+                // playAudio in service already starts playback if configured? 
+                // Wait, AudioService.playAudio returns sound object. 
+                // Let's check AudioService implementation. 
+                // It does { shouldPlay: true }. So it plays automatically.
+            }
         } catch (error) {
             console.log(error);
         }
@@ -179,7 +180,7 @@ export default function ProfileScreen() {
         const expandedContentStyle = useAnimatedStyle(() => {
             const opacity = interpolate(
                 scrollY.value,
-                [0, 80], // Start fading earlier
+                [0, 80],
                 [1, 0],
                 Extrapolation.CLAMP
             );
@@ -189,9 +190,13 @@ export default function ProfileScreen() {
                 [1, 0.9],
                 Extrapolation.CLAMP
             );
+            // Ensure expanded content is clickable when visible
+            const zIndex = scrollY.value < 80 ? 10 : 0;
+
             return {
                 opacity,
-                transform: [{ scale }]
+                transform: [{ scale }],
+                zIndex
             };
         });
 
@@ -209,14 +214,18 @@ export default function ProfileScreen() {
                 [20, 0],
                 Extrapolation.CLAMP
             );
+            // Ensure collapsed content is clickable when visible
+            const zIndex = scrollY.value > 100 ? 10 : 0;
+
             return {
                 opacity,
-                transform: [{ translateY }]
+                transform: [{ translateY }],
+                zIndex
             };
         });
 
         return (
-            <Animated.View style={[styles.headerContainer, headerStyle]}>
+            <Animated.View style={[styles.headerContainer, headerStyle]} pointerEvents="box-none">
                 <LinearGradient
                     colors={[colors.primary, '#4f46e5', colors.background]} // Enhanced gradient
                     start={{ x: 0, y: 0 }}
@@ -225,8 +234,11 @@ export default function ProfileScreen() {
                 />
 
                 {/* EXPANDED STATE (Centered Big Profile) */}
-                <Animated.View style={[styles.headerContentExpanded, expandedContentStyle, { paddingTop: insets.top + 40 }]}>
-                    <View style={styles.avatarContainer}>
+                <Animated.View
+                    style={[styles.headerContentExpanded, expandedContentStyle, { paddingTop: insets.top + 40 }]}
+                    pointerEvents="box-none"
+                >
+                    <TouchableOpacity onPress={() => setShowStatsModal(true)} activeOpacity={0.8} style={styles.avatarContainer}>
                         <LinearGradient
                             colors={['rgba(255,255,255,0.2)', 'rgba(255,255,255,0.05)']}
                             style={styles.avatarGradient}
@@ -235,7 +247,7 @@ export default function ProfileScreen() {
                                 {(userData?.displayName || user?.email)?.charAt(0).toUpperCase()}
                             </Text>
                         </LinearGradient>
-                    </View>
+                    </TouchableOpacity>
 
                     <View style={styles.nameContainer}>
                         {isEditingName ? (
@@ -257,41 +269,78 @@ export default function ProfileScreen() {
                                 <Text style={styles.displayName}>
                                     {userData?.displayName || 'Add Name'}
                                 </Text>
-                                <TouchableOpacity onPress={() => setIsEditingName(true)} style={styles.editIcon}>
-                                    <Ionicons name="pencil" size={12} color="rgba(255,255,255,0.8)" />
+                                <TouchableOpacity
+                                    onPress={() => setIsEditingName(true)}
+                                    style={styles.editIcon}
+                                    hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
+                                >
+                                    <Ionicons name="pencil" size={14} color="rgba(255,255,255,0.8)" />
                                 </TouchableOpacity>
                             </View>
                         )}
                         <Text style={styles.emailText}>{user?.email}</Text>
 
-                        {userData?.valley_affiliation && (
-                            <View style={styles.valleyBadge}>
-                                <Ionicons name="location" size={10} color="#fff" />
-                                <Text style={styles.valleyText}>{userData.valley_affiliation}</Text>
+                        <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                            {/* Status Badge */}
+                            <View style={[styles.valleyBadge, {
+                                backgroundColor: userData?.isAdmin ? 'rgba(239, 68, 68, 0.2)' :
+                                    userData?.status === 'Guide' ? 'rgba(234, 179, 8, 0.2)' :
+                                        'rgba(74, 222, 128, 0.2)',
+                                borderColor: userData?.isAdmin ? 'rgba(239, 68, 68, 0.4)' :
+                                    userData?.status === 'Guide' ? 'rgba(234, 179, 8, 0.4)' :
+                                        'rgba(74, 222, 128, 0.4)'
+                            }]}>
+                                <Ionicons
+                                    name={userData?.isAdmin ? "shield" : userData?.status === 'Guide' ? "compass" : "leaf"}
+                                    size={10}
+                                    color={userData?.isAdmin ? '#f87171' : userData?.status === 'Guide' ? '#facc15' : '#4ade80'}
+                                />
+                                <Text style={[styles.valleyText, {
+                                    color: userData?.isAdmin ? '#f87171' : userData?.status === 'Guide' ? '#facc15' : '#4ade80'
+                                }]}>
+                                    {userData?.isAdmin ? 'Admin' : (userData?.status || 'Pioneer')}
+                                </Text>
                             </View>
-                        )}
+
+                            {userData?.valley_affiliation && (
+                                <View style={styles.valleyBadge}>
+                                    <Ionicons name="location" size={10} color="#fff" />
+                                    <Text style={styles.valleyText}>{userData.valley_affiliation}</Text>
+                                </View>
+                            )}
+                        </View>
                     </View>
                 </Animated.View>
 
                 {/* COLLAPSED STATE (Sticky Header with Mini Stats) */}
-                <Animated.View style={[styles.headerContentCollapsed, collapsedContentStyle, { paddingTop: insets.top }]}>
+                <Animated.View
+                    style={[styles.headerContentCollapsed, collapsedContentStyle, { paddingTop: insets.top }]}
+                    pointerEvents="box-none"
+                >
                     <View style={styles.collapsedLeft}>
                         {/* Mini Avatar */}
-                        <View style={styles.miniAvatar}>
+                        <TouchableOpacity onPress={() => setShowStatsModal(true)} style={styles.miniAvatar}>
                             <Text style={styles.miniAvatarText}>
                                 {(userData?.displayName || user?.email)?.charAt(0).toUpperCase()}
                             </Text>
-                        </View>
+                        </TouchableOpacity>
                         <View>
                             <Text style={styles.collapsedName} numberOfLines={1}>
                                 {userData?.displayName || 'Profile'}
                             </Text>
-                            {/* Mini Stats Scroller in Header */}
-                            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ maxWidth: 150 }}>
-                                <Text style={styles.collapsedStats}>
-                                    {userData?.points || 0} pts • {myEntries.length} words
-                                </Text>
-                            </ScrollView>
+                            <Text style={styles.collapsedStats}>
+                                {userData?.points || 0} pts • {myEntries.length} words
+                            </Text>
+                            <Text style={{
+                                fontSize: 10,
+                                fontWeight: '800',
+                                marginTop: 2,
+                                color: userData?.isAdmin ? '#f87171' :
+                                    userData?.status === 'Guide' ? '#facc15' :
+                                        '#4ade80'
+                            }}>
+                                {userData?.isAdmin ? 'ADMIN' : (userData?.status || 'PIONEER').toUpperCase()}
+                            </Text>
                         </View>
                     </View>
                 </Animated.View>
@@ -309,71 +358,139 @@ export default function ProfileScreen() {
         );
     };
 
-    const StatsSection = () => (
-        <View style={styles.statsWrapper}>
-            {/* Cleaner, no grey box, just nice spaced numbers */}
-            <View style={styles.statsRow}>
-                <View style={styles.statItem}>
-                    <NumberTicker number={userData?.points || 0} style={[styles.statValue, { color: colors.primary }]} />
-                    <Text style={[styles.statLabel, { color: colors.textLight }]}>Points</Text>
-                </View>
-                <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
-                <View style={styles.statItem}>
-                    <NumberTicker number={myEntries.length} style={[styles.statValue, { color: colors.primary }]} />
-                    <Text style={[styles.statLabel, { color: colors.textLight }]}>Words</Text>
-                </View>
-                <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
-                <View style={styles.statItem}>
-                    <NumberTicker number={userData?.dialect_count || 0} style={[styles.statValue, { color: colors.primary }]} />
-                    <Text style={[styles.statLabel, { color: colors.textLight }]}>Dialects</Text>
-                </View>
-            </View>
-        </View>
-    );
 
-    const renderEntry = ({ item, index }) => (
-        <Animated.View
-            entering={FadeInDown.delay(index * 50).springify()}
-            layout={Layout.springify()}
-            style={[styles.cardContainer, { backgroundColor: colors.surface }]}
-        >
-            <View style={styles.cardContent}>
-                <View style={styles.wordRow}>
-                    <Text style={[styles.wordText, { color: colors.text }]}>{item.word}</Text>
-                    {item.status === 'verified' && (
-                        <Ionicons name="checkmark-circle" size={16} color={colors.success} style={{ marginLeft: 6 }} />
-                    )}
-                </View>
-                <Text style={[styles.dialectText, { color: colors.textLight }]}>{item.dialect}</Text>
 
-                <View style={[
-                    styles.statusBadge,
-                    { backgroundColor: item.status === 'verified' ? `${colors.success}15` : colors.inputBg }
-                ]}>
-                    <Text style={[
-                        styles.statusText,
-                        { color: item.status === 'verified' ? colors.success : '#D97706' }
-                    ]}>
-                        {item.status.toUpperCase()}
-                    </Text>
-                </View>
-            </View>
+    const renderEntry = ({ item, index }) => {
+        const hasAudio = item.audioURL && item.audioURL.trim() !== '';
+        // Calculate progress
+        const voteCount = item.vote_count || 0;
+        const isVerified = item.status === 'verified';
+        const isRejected = item.status === 'rejected';
+        const isExpanded = expandedId === item.id;
 
-            <TouchableOpacity
-                onPress={() => playSound(item.audioURL)}
-                style={[styles.playButton, { backgroundColor: `${colors.primary}15` }]}
+        const statusColor = isVerified ? colors.success : isRejected ? colors.error : '#D97706';
+
+        return (
+            <Animated.View
+                entering={FadeInDown.delay(index * 50).springify()}
+                layout={Layout.springify()}
+                style={[styles.cardContainer, { backgroundColor: colors.surface, overflow: 'hidden', padding: 0 }]}
             >
-                <Ionicons name="play" size={24} color={colors.primary} />
-            </TouchableOpacity>
-        </Animated.View>
-    );
+                <TouchableOpacity
+                    activeOpacity={0.9}
+                    onPress={() => setExpandedId(isExpanded ? null : item.id)}
+                >
+                    <View style={styles.cardMainRow}>
+                        {/* Left Status Strip */}
+                        <View style={[styles.leftStrip, { backgroundColor: statusColor }]}>
+                            {/* Emphasized Vote Count if pending */}
+                            {!isVerified && !isRejected && (
+                                <View style={styles.stripVoteContainer}>
+                                    <Text style={styles.stripVoteCount}>{voteCount}</Text>
+                                    <Text style={styles.stripVoteTotal}>/7</Text>
+                                </View>
+                            )}
+                            {(isVerified || isRejected) && (
+                                <Ionicons
+                                    name={isVerified ? "checkmark-circle" : "close-circle"}
+                                    size={20}
+                                    color="#fff"
+                                    style={{ marginTop: 12 }}
+                                />
+                            )}
+                        </View>
 
-    const ListHeader = () => {
+                        {/* Right Content */}
+                        <View style={styles.rightContent}>
+                            <View style={styles.cardHeaderRow}>
+                                <Text style={[styles.wordText, { color: colors.text }]}>{item.word}</Text>
+                                {hasAudio ? (
+                                    <TouchableOpacity
+                                        onPress={() => playSound(item.audioURL, item.id)}
+                                        style={[styles.playButtonSmall, { backgroundColor: `${colors.primary}15` }]}
+                                    >
+                                        <Ionicons name="play" size={16} color={colors.primary} />
+                                    </TouchableOpacity>
+                                ) : (
+                                    <View style={styles.noAudioBadge}>
+                                        <Text style={[styles.noAudioText, { color: colors.textLight }]}>No Audio</Text>
+                                    </View>
+                                )}
+                            </View>
+
+                            <Text style={[styles.meaningText, { color: colors.text }]}>{item.meaning}</Text>
+
+                            <View style={styles.metaRow}>
+                                <Text style={[styles.dialectText, { color: colors.textLight }]}>
+                                    {item.dialect} • <Text style={{ color: statusColor, fontWeight: '700' }}>{item.status.toUpperCase()}</Text>
+                                </Text>
+                            </View>
+                        </View>
+                    </View>
+
+                    {/* Expanded Details */}
+                    {isExpanded && (
+                        <View style={[styles.expandedContent, { borderTopWidth: 1, borderTopColor: colors.border }]}>
+                            <View style={styles.expandedDetailRow}>
+                                <Text style={[styles.expandedLabel, { color: colors.textLight }]}>Entry ID:</Text>
+                                <Text style={[styles.expandedValue, { color: colors.text }]}>{item.id.slice(0, 8)}...</Text>
+                            </View>
+                            <View style={styles.expandedDetailRow}>
+                                <Text style={[styles.expandedLabel, { color: colors.textLight }]}>Rejections:</Text>
+                                <Text style={[styles.expandedValue, { color: colors.error }]}>{item.rejection_count || 0}</Text>
+                            </View>
+                            {item.timestamp?.seconds && (
+                                <View style={styles.expandedDetailRow}>
+                                    <Text style={[styles.expandedLabel, { color: colors.textLight }]}>Added:</Text>
+                                    <Text style={[styles.expandedValue, { color: colors.text }]}>
+                                        {new Date(item.timestamp.seconds * 1000).toLocaleDateString()}
+                                    </Text>
+                                </View>
+                            )}
+                        </View>
+                    )}
+                </TouchableOpacity>
+            </Animated.View>
+        );
+    };
+
+    const [searchQuery, setSearchQuery] = useState('');
+    const [isSearching, setIsSearching] = useState(false);
+    const [visibleCount, setVisibleCount] = useState(6);
+    const [filterStatus, setFilterStatus] = useState('All');
+
+    // Reset visible count when filter or search changes
+    useEffect(() => {
+        setVisibleCount(6);
+    }, [filterStatus, searchQuery]);
+
+    const filteredEntries = myEntries.filter(e => {
+        // Status Filter
+        if (filterStatus !== 'All') {
+            if (filterStatus === 'Verified' && e.status !== 'verified') return false;
+            if (filterStatus === 'Pending' && e.status !== 'pending') return false;
+        }
+        // Search Filter
+        if (searchQuery.trim()) {
+            const query = searchQuery.toLowerCase();
+            return (
+                e.word.toLowerCase().includes(query) ||
+                e.meaning.toLowerCase().includes(query)
+            );
+        }
+        return true;
+    });
+
+    const displayedEntries = filteredEntries.slice(0, visibleCount);
+
+    // Fix: Define renderListHeader as a function returning an Element (stable across renders)
+    // instead of a Component (which would remount on every parent render)
+    const renderListHeader = useMemo(() => {
         const earnedBadges = (userData?.badges || []).map(id => getBadgeById(id)).filter(Boolean);
 
         return (
             <View style={styles.listHeaderContext}>
-                <StatsSection />
+                <StatsSection userData={userData} myEntries={myEntries} colors={colors} />
 
                 {earnedBadges.length > 0 && (
                     <View style={styles.sectionContainer}>
@@ -389,46 +506,124 @@ export default function ProfileScreen() {
                     </View>
                 )}
 
-                <Text style={[styles.sectionTitle, { color: colors.text, marginTop: SPACING.l }]}>
-                    My Contributions ({myEntries.length})
-                </Text>
+                <View style={styles.filterSection}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.s }}>
+                        {isSearching ? (
+                            // LayoutAnimation is better for preventing remounts, but here we can just key it properly
+                            <Animated.View
+                                key="searchBar"
+                                entering={FadeInRight.duration(200)}
+                                style={[styles.searchContainer, { backgroundColor: colors.inputBg }]}
+                            >
+                                <Ionicons name="search" size={16} color={colors.textLight} style={{ marginLeft: 8 }} />
+                                <TextInput
+                                    ref={input => {
+                                        // Auto-focus logic moved here to avoid useEffect dependency on remount
+                                        if (input && isSearching) input.focus();
+                                    }}
+                                    style={[styles.searchInput, { color: colors.text, paddingVertical: 0 }]}
+                                    placeholder="Search words..."
+                                    placeholderTextColor={colors.textLight}
+                                    value={searchQuery}
+                                    onChangeText={setSearchQuery}
+                                />
+                                <TouchableOpacity onPress={() => { setIsSearching(false); setSearchQuery(''); }} style={{ padding: 4 }}>
+                                    <Ionicons name="close" size={18} color={colors.textLight} />
+                                </TouchableOpacity>
+                            </Animated.View>
+                        ) : (
+                            <Animated.Text
+                                key="title"
+                                entering={FadeIn.duration(200)}
+                                style={[styles.sectionTitle, { color: colors.text, marginBottom: 0 }]}
+                            >
+                                My Contributions
+                            </Animated.Text>
+                        )}
+
+                        {!isSearching && (
+                            <TouchableOpacity onPress={() => setIsSearching(true)} style={styles.searchIconBtn}>
+                                <Ionicons name="search" size={20} color={colors.primary} />
+                            </TouchableOpacity>
+                        )}
+                    </View>
+
+                    {/* Filter Pills */}
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll}>
+                        {['All', 'Verified', 'Pending'].map((status) => (
+                            <TouchableOpacity
+                                key={status}
+                                onPress={() => setFilterStatus(status)}
+                                style={[
+                                    styles.filterPill,
+                                    {
+                                        backgroundColor: filterStatus === status ? colors.primary : colors.inputBg,
+                                        borderWidth: 1,
+                                        borderColor: filterStatus === status ? colors.primary : 'transparent'
+                                    }
+                                ]}
+                            >
+                                <Text style={[
+                                    styles.filterText,
+                                    { color: filterStatus === status ? '#fff' : colors.textLight }
+                                ]}>
+                                    {status}
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
+                    </ScrollView>
+                </View>
             </View>
         );
-    };
+    }, [userData, myEntries, isSearching, searchQuery, filterStatus, colors, isDark]);
 
     const ListFooter = () => {
-        if (!userData?.isAdmin) return <View style={{ height: 100 }} />;
-
         return (
-            <View style={[styles.adminSection, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                <Text style={[styles.adminTitle, { color: colors.text }]}>🔧 Admin Controls</Text>
-                <View style={styles.adminButtons}>
+            <View style={{ paddingBottom: 100 }}>
+                {/* Load More Button */}
+                {visibleCount < filteredEntries.length && (
                     <TouchableOpacity
-                        style={[styles.adminBtn, { backgroundColor: colors.inputBg }]}
-                        onPress={async () => {
-                            setSyncing(true);
-                            await forceSyncDictionary();
-                            setSyncing(false);
-                            alert(`Synced successfully`);
-                        }}
-                        disabled={syncing}
+                        onPress={() => setVisibleCount(prev => prev + 6)}
+                        style={[styles.loadMoreBtn, { backgroundColor: colors.inputBg }]}
                     >
-                        <Ionicons name="cloud-download" size={20} color={colors.primary} />
-                        <Text style={[styles.adminBtnText, { color: colors.primary }]}>
-                            {syncing ? 'Syncing...' : 'Force Sync'}
-                        </Text>
+                        <Text style={[styles.loadMoreText, { color: colors.primary }]}>Load More</Text>
+                        <Ionicons name="chevron-down" size={16} color={colors.primary} />
                     </TouchableOpacity>
-                    <TouchableOpacity
-                        style={[styles.adminBtn, styles.adminBtnDanger]}
-                        onPress={async () => {
-                            await clearLocalDatabase();
-                            alert('Local database cleared. Restart app.');
-                        }}
-                    >
-                        <Ionicons name="trash" size={20} color="#EF4444" />
-                        <Text style={[styles.adminBtnText, { color: '#EF4444' }]}>Clear DB</Text>
-                    </TouchableOpacity>
-                </View>
+                )}
+
+                {/* Admin Section (Only if Admin) */}
+                {userData?.isAdmin && (
+                    <View style={[styles.adminSection, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                        <Text style={[styles.adminTitle, { color: colors.text }]}>🔧 Admin Controls</Text>
+                        <View style={styles.adminButtons}>
+                            <TouchableOpacity
+                                style={[styles.adminBtn, { backgroundColor: colors.inputBg }]}
+                                onPress={async () => {
+                                    setSyncing(true);
+                                    await forceSyncDictionary();
+                                    setSyncing(false);
+                                    alert(`Synced successfully`);
+                                }}
+                                disabled={syncing}
+                            >
+                                <Ionicons name="cloud-download" size={20} color={colors.primary} />
+                                <Text style={[styles.adminBtnText, { color: colors.primary }]}>
+                                    {syncing ? 'Syncing...' : 'Force Sync'}
+                                </Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.adminBtn, styles.adminBtnDanger]}
+                                onPress={async () => {
+                                    await clearLocalDatabase();
+                                    alert('Local database cleared. Restart app.');
+                                }}
+                            >
+                                <Ionicons name="trash" size={20} color="#EF4444" />
+                                <Text style={[styles.adminBtnText, { color: '#EF4444' }]}>Clear DB</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                )}
             </View>
         );
     };
@@ -445,21 +640,24 @@ export default function ProfileScreen() {
         <View style={[styles.container, { backgroundColor: colors.background }]}>
             <StatusBar barStyle="light-content" />
 
-            {/* Background Header Parallax Spacer */}
-            <ProfileHeader />
+            {/* Content List - Render FIRST so Header is structurally on top if zIndex fails, 
+                but actually in RN, last element is on top. 
+                Wait, if I put FlatList first, Header (absolute) will be on top.
+                Currently Header is first. 
+                Let's swap them. */}
 
             <Animated.FlatList
-                data={myEntries}
+                data={displayedEntries}
                 renderItem={renderEntry}
                 keyExtractor={(item) => item.id}
                 contentContainerStyle={{
-                    paddingTop: HEADER_HEIGHT_EXPANDED, // No overlap - safe layout
+                    paddingTop: HEADER_HEIGHT_EXPANDED + 20, // Add a bit more space
                     paddingHorizontal: SPACING.m,
                     paddingBottom: 100
                 }}
                 onScroll={scrollHandler}
                 scrollEventThrottle={16}
-                ListHeaderComponent={ListHeader}
+                ListHeaderComponent={renderListHeader}
                 ListFooterComponent={ListFooter}
                 ListEmptyComponent={
                     <View style={styles.emptyContainer}>
@@ -469,12 +667,50 @@ export default function ProfileScreen() {
                         </Text>
                     </View>
                 }
-                refreshing={refreshing}
-                onRefresh={onRefresh}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
+                        progressViewOffset={HEADER_HEIGHT_EXPANDED}
+                        tintColor={colors.primary}
+                    />
+                }
+            />
+
+            {/* Background Header Parallax Spacer - Moved BELOW FlatList for Z-order safety */}
+            <ProfileHeader />
+
+            <ShareableStatsModal
+                visible={showStatsModal}
+                onClose={() => setShowStatsModal(false)}
+                userData={userData}
+                contributionCount={myEntries.length}
             />
         </View>
     );
 }
+
+
+const StatsSection = React.memo(({ userData, myEntries, colors }) => (
+    <View style={styles.statsWrapper}>
+        <View style={styles.statsRow}>
+            <View style={styles.statItem}>
+                <NumberTicker number={userData?.points || 0} style={[styles.statValue, { color: colors.primary }]} />
+                <Text style={[styles.statLabel, { color: colors.textLight }]}>Points</Text>
+            </View>
+            <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
+            <View style={styles.statItem}>
+                <NumberTicker number={myEntries.length} style={[styles.statValue, { color: colors.primary }]} />
+                <Text style={[styles.statLabel, { color: colors.textLight }]}>Words</Text>
+            </View>
+            <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
+            <View style={styles.statItem}>
+                <NumberTicker number={userData?.dialect_count || 0} style={[styles.statValue, { color: colors.primary }]} />
+                <Text style={[styles.statLabel, { color: colors.textLight }]}>Dialects</Text>
+            </View>
+        </View>
+    </View>
+));
 
 const styles = StyleSheet.create({
     container: {
@@ -490,8 +726,9 @@ const styles = StyleSheet.create({
         top: 0,
         left: 0,
         right: 0,
-        zIndex: 10,
+        zIndex: 100, // Ensure it's clickable
         overflow: 'hidden',
+        elevation: 10,
     },
     headerContentExpanded: {
         alignItems: 'center',
@@ -689,9 +926,6 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
     cardContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        padding: 16,
         marginBottom: 12,
         borderRadius: 16,
         shadowColor: "#000",
@@ -699,6 +933,7 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.05,
         shadowRadius: 8,
         elevation: 2,
+        width: '100%',
     },
     cardContent: {
         flex: 1,
@@ -780,4 +1015,167 @@ const styles = StyleSheet.create({
         fontSize: 13,
         fontWeight: '700',
     },
+
+    // NEW CARD STYLES
+    cardMainRow: {
+        flexDirection: 'row',
+        minHeight: 90,
+    },
+    leftStrip: {
+        width: 50,
+        alignItems: 'center',
+        paddingTop: 16,
+    },
+    stripVoteContainer: {
+        alignItems: 'center',
+    },
+    stripVoteCount: {
+        fontSize: 20,
+        fontWeight: '800',
+        color: '#fff',
+        lineHeight: 22,
+    },
+    stripVoteTotal: {
+        fontSize: 10,
+        fontWeight: '600',
+        color: 'rgba(255,255,255,0.8)',
+    },
+    // SUMMARY & FILTER STYLES
+    summaryCard: {
+        padding: 16,
+        borderRadius: 16,
+        marginBottom: 24,
+        marginTop: 0, // was 8
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    summaryRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    summaryIcon: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 12,
+    },
+    summaryLabel: {
+        fontSize: 12,
+        fontWeight: '600',
+        marginBottom: 2,
+    },
+    summaryValue: {
+        fontSize: 18,
+        fontWeight: '800',
+    },
+    filterSection: {
+        marginBottom: 16,
+    },
+    filterScroll: {
+        marginTop: 8,
+    },
+    filterPill: {
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 20,
+        marginRight: 10,
+    },
+    filterText: {
+        fontSize: 13,
+        fontWeight: '600',
+    },
+    // SEARCH & PAGINATION
+    searchContainer: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 8,
+        paddingVertical: 8,
+        borderRadius: 12,
+        height: 40,
+        marginRight: 8,
+    },
+    searchInput: {
+        flex: 1,
+        height: '100%',
+        marginLeft: 8,
+        fontSize: 14,
+        fontWeight: '500',
+    },
+    searchIconBtn: {
+        width: 40,
+        height: 40,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: 20,
+        backgroundColor: 'rgba(0,0,0,0.03)',
+    },
+    loadMoreBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 12,
+        borderRadius: 20,
+        marginHorizontal: 40,
+        marginBottom: 32,
+        gap: 8,
+    },
+    loadMoreText: {
+        fontSize: 14,
+        fontWeight: '700',
+    },
+    rightContent: {
+        flex: 1,
+        padding: 12,
+        justifyContent: 'center',
+    },
+    cardHeaderRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 4,
+    },
+    playButtonSmall: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginLeft: 8,
+    },
+    noAudioBadge: {
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 6,
+        backgroundColor: 'rgba(0,0,0,0.05)',
+    },
+    noAudioText: {
+        fontSize: 10,
+        fontWeight: '600',
+    },
+    metaRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: 6,
+    },
+    // EXPANDED STYLES
+    expandedContent: {
+        padding: 16,
+        backgroundColor: 'rgba(0,0,0,0.02)',
+    },
+    expandedDetailRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: 8,
+    },
+    expandedLabel: {
+        fontSize: 12,
+        fontWeight: '600',
+    },
+    expandedValue: {
+        fontSize: 12,
+        fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    }
 });

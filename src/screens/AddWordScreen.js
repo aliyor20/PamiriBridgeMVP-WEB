@@ -1,80 +1,116 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     View,
     Text,
     StyleSheet,
-    ActivityIndicator,
     Alert,
     ScrollView,
     KeyboardAvoidingView,
     Platform,
     TouchableOpacity,
-    SafeAreaView
+    LayoutAnimation,
+    UIManager,
+    Dimensions,
+    useWindowDimensions
 } from 'react-native';
+import { TabView, SceneMap } from 'react-native-tab-view';
+import Animated, { useAnimatedStyle, withTiming } from 'react-native-reanimated';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Audio } from 'expo-av';
-import { db, storage, auth } from '../firebaseConfig';
-import { collection, addDoc, serverTimestamp, doc, updateDoc, increment } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { Ionicons } from '@expo/vector-icons';
+import { startRecording, stopRecording } from '../services/AudioService';
+import { db, storage, auth } from '../firebaseConfig';
+import { collection, addDoc, serverTimestamp, doc, updateDoc, increment, runTransaction, query, where, getDocs } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { useNavigation } from '@react-navigation/native';
 
-import { COLORS, SPACING, TYPOGRAPHY, LAYOUT } from '../constants/theme';
+import { SPACING, TYPOGRAPHY, LAYOUT } from '../constants/theme';
+import { usePreferences } from '../context/PreferencesContext';
+import { useContribute } from '../context/ContributeContext';
 import Button from '../components/Button';
 import Input from '../components/Input';
 import DialectChip from '../components/DialectChip';
+import ReviewScreen from './ReviewScreen';
+import ActionModal from '../components/ActionModal';
 
-const DIALECTS = ["Shughni", "Rushani", "Wakhi", "Yazghulami", "Sarikoli", "Bartangi", "Ishkashimi"];
+import { DIALECTS } from '../constants/dataConfig';
 
-export default function AddWordScreen() {
+// Enable LayoutAnimation for Android
+if (Platform.OS === 'android') {
+    if (UIManager.setLayoutAnimationEnabledExperimental) {
+        UIManager.setLayoutAnimationEnabledExperimental(true);
+    }
+}
+
+export default function AddWordScreen({ route }) {
     const navigation = useNavigation();
+    const { colors } = usePreferences();
+    const { initialWord, initialDialect } = route?.params || {};
+    const layout = useWindowDimensions();
 
-    const [word, setWord] = useState('');
+    // Global Mode Context
+    const { mode, setMode } = useContribute();
+
+    // Tab View State
+    const [index, setIndex] = useState(mode === 'contribute' ? 0 : 1);
+    const [routes] = useState([
+        { key: 'contribute', title: 'Contribute' },
+        { key: 'verify', title: 'Verify' },
+    ]);
+
+    // --- CONTRIBUTE FORM STATE ---
+    const [word, setWord] = useState(initialWord || '');
     const [meaning, setMeaning] = useState('');
-    const [selectedDialect, setSelectedDialect] = useState(DIALECTS[0]);
+    const contributionDialects = DIALECTS.filter(d => d !== 'All');
+    const [selectedDialect, setSelectedDialect] = useState(initialDialect || contributionDialects[0]);
 
     const [recording, setRecording] = useState(null);
     const [recordUri, setRecordUri] = useState(null);
     const [sound, setSound] = useState(null);
     const [isRecording, setIsRecording] = useState(false);
-    const [permissionResponse, requestPermission] = Audio.usePermissions();
-
     const [uploading, setUploading] = useState(false);
 
     useEffect(() => {
         return () => {
-            if (recording) recording.stopAndUnloadAsync();
+            if (recording) stopRecording(recording);
             if (sound) sound.unloadAsync();
         };
-    }, [recording, sound]);
+    }, []);
 
-    async function startRecording() {
+    // Sync TabView index with Context Mode
+    useEffect(() => {
+        const newIndex = mode === 'contribute' ? 0 : 1;
+        if (newIndex !== index) {
+            setIndex(newIndex);
+        }
+    }, [mode]);
+
+    // Sync Context Mode with TabView index
+    const handleIndexChange = (newIndex) => {
+        setIndex(newIndex);
+        const newMode = newIndex === 0 ? 'contribute' : 'verify';
+        if (newMode !== mode) {
+            setMode(newMode);
+        }
+    };
+
+    // --- AUDIO LOGIC ---
+    async function handleStartRecording() {
         try {
-            if (permissionResponse?.status !== 'granted') {
-                await requestPermission();
-            }
-
-            await Audio.setAudioModeAsync({
-                allowsRecordingIOS: true,
-                playsInSilentModeIOS: true,
-            });
-
-            const { recording } = await Audio.Recording.createAsync(
-                Audio.RecordingOptionsPresets.HIGH_QUALITY
-            );
-            setRecording(recording);
+            const newRecording = await startRecording();
+            setRecording(newRecording);
             setIsRecording(true);
             setRecordUri(null);
         } catch (err) {
-            Alert.alert("Error", "Failed to start recording.");
+            Alert.alert("Error", "Failed to start recording. Check permissions.");
         }
     }
 
-    async function stopRecording() {
+    async function handleStopRecording() {
         setIsRecording(false);
         if (!recording) return;
 
-        await recording.stopAndUnloadAsync();
-        const uri = recording.getURI();
+        const uri = await stopRecording(recording);
         setRecordUri(uri);
         setRecording(null);
     }
@@ -91,14 +127,45 @@ export default function AddWordScreen() {
         }
     }
 
+    // --- MODAL STATE ---
+    const [modal, setModal] = useState({
+        visible: false,
+        type: 'success',
+        title: '',
+        message: '',
+        onAction: () => { },
+        points: 0
+    });
+
+    const showModal = (config) => {
+        setModal({ ...config, visible: true });
+    };
+
+    const hideModal = () => {
+        setModal(prev => ({ ...prev, visible: false }));
+    };
+
+    // --- SUBMIT LOGIC ---
     const handleSubmit = async () => {
-        if (!word.trim()) return Alert.alert("Missing Field", "Please enter a word.");
-        if (!recordUri) return Alert.alert("Missing Audio", "Please record the pronunciation.");
+        if (!word.trim()) {
+            showModal({
+                type: 'error',
+                title: 'Missing Word',
+                message: 'Please enter a word to contribute.',
+                onAction: hideModal
+            });
+            return;
+        }
 
         setUploading(true);
+        let storageRef = null;
+
         try {
             const user = auth.currentUser;
             if (!user) throw new Error("Not authenticated");
+
+            // 1. Prepare Entry Data & ID (Client-side ID)
+            const newEntryRef = doc(collection(db, 'entries'));
 
             const entryData = {
                 word: word.trim().toLowerCase(),
@@ -107,148 +174,294 @@ export default function AddWordScreen() {
                 contributorId: user.uid,
                 status: 'pending',
                 timestamp: serverTimestamp(),
-                audioURL: ""
             };
 
-            const docRef = await addDoc(collection(db, 'entries'), entryData);
+            // 2. Upload Audio (if provided)
+            let downloadURL = null;
+            if (recordUri) {
+                const blob = await new Promise((resolve, reject) => {
+                    const xhr = new XMLHttpRequest();
+                    xhr.onload = function () { resolve(xhr.response); };
+                    xhr.onerror = function (e) { reject(new TypeError('Network request failed')); };
+                    xhr.responseType = 'blob';
+                    xhr.open('GET', recordUri, true);
+                    xhr.send(null);
+                });
 
-            const blob = await new Promise((resolve, reject) => {
-                const xhr = new XMLHttpRequest();
-                xhr.onload = function () { resolve(xhr.response); };
-                xhr.onerror = function (e) { reject(new TypeError('Network request failed')); };
-                xhr.responseType = 'blob';
-                xhr.open('GET', recordUri, true);
-                xhr.send(null);
+                storageRef = ref(storage, `audio/${newEntryRef.id}.m4a`);
+                await uploadBytes(storageRef, blob);
+                downloadURL = await getDownloadURL(storageRef);
+            }
+
+            // 3. Execute Transaction
+            await runTransaction(db, async (transaction) => {
+                const userRef = doc(db, 'users', user.uid);
+                const userDoc = await transaction.get(userRef);
+
+                if (!userDoc.exists()) throw new Error("User profile not found");
+
+                const finalEntryData = {
+                    ...entryData,
+                    ...(downloadURL && { audioURL: downloadURL })  // Only add audioURL if it exists
+                };
+
+                transaction.set(newEntryRef, finalEntryData);
+
+                const newPoints = (userDoc.data().points || 0) + 1;
+                transaction.update(userRef, { points: newPoints });
             });
 
-            const storageRef = ref(storage, `audio/${docRef.id}.m4a`);
-            await uploadBytes(storageRef, blob);
+            // 4. Calculate Daily Count
+            // In a real app, this might be a separate query or counter document.
+            // For MVP, we'll do a quick client-side query for today's entries.
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
 
-            const downloadURL = await getDownloadURL(storageRef);
-            await updateDoc(docRef, { audioURL: downloadURL });
-
-            const userRef = doc(db, 'users', user.uid);
-            await updateDoc(userRef, {
-                points: increment(1),
-            });
-
-            Alert.alert(
-                "Success!",
-                "Contribution submitted. (+1 Point)",
-                [{
-                    text: "Done",
-                    onPress: () => {
-                        setWord('');
-                        setMeaning('');
-                        setRecordUri(null);
-                        navigation.navigate('Dictionary');
-                    }
-                }, {
-                    text: "Add Another",
-                    onPress: () => {
-                        setWord('');
-                        setMeaning('');
-                        setRecordUri(null);
-                    }
-                }]
+            const q = query(
+                collection(db, 'entries'),
+                where('contributorId', '==', user.uid)
+                // Removed timestamp query to avoid index creation requirement for now
             );
+            const snapshot = await getDocs(q);
+
+            // Client-side filtering for today's count
+            // This is safer for MVP as it works without custom indexes
+            const dailyCount = snapshot.docs.filter(doc => {
+                const data = doc.data();
+                if (!data.timestamp) return false;
+                const docDate = data.timestamp.toDate(); // Firestore timestamp to JS Date
+                return docDate >= today;
+            }).length;
+
+            // SUCCESS! Show refined popup
+            showModal({
+                type: 'success',
+                title: 'Sent for Verification',
+                message: 'Your word is waiting for verification.',
+                points: 1,
+                word: word.trim(),           // Pass word for emphasis
+                dialect: selectedDialect,    // Pass dialect
+                dailyCount: dailyCount,      // Pass today's count
+                primaryActionLabel: 'Continue',
+                onPrimaryAction: () => {
+                    setWord('');
+                    setMeaning('');
+                    setRecordUri(null);
+                    hideModal();
+                }
+            });
 
         } catch (error) {
-            console.error(error);
-            Alert.alert("Error", "Submission failed.");
+            console.error("Submission failed:", error);
+            if (storageRef) {
+                try { await deleteObject(storageRef); } catch (e) { }
+            }
+            showModal({
+                type: 'error',
+                title: 'Submission Failed',
+                message: 'Could not submit your contribution. Please try again.',
+                onAction: hideModal
+            });
         } finally {
             setUploading(false);
         }
     };
 
-    return (
-        <SafeAreaView style={styles.container}>
-            <KeyboardAvoidingView
-                style={{ flex: 1 }}
-                behavior={Platform.OS === "ios" ? "padding" : "height"}
+    // --- RENDER HELPERS ---
+
+    // Animated slider position
+    const sliderStyle = useAnimatedStyle(() => {
+        const containerWidth = layout.width - SPACING.l * 2 - 8; // Account for container padding
+        const sliderWidth = (containerWidth - 4) / 2; // Half width minus padding
+        return {
+            transform: [
+                {
+                    translateX: withTiming(index === 0 ? 0 : sliderWidth + 4, {
+                        duration: 200,
+                    })
+                }
+            ]
+        };
+    });
+
+    const renderToggle = () => (
+        <View style={[styles.toggleContainer, { backgroundColor: colors.inputBg }]}>
+            <Animated.View style={[styles.slider, { backgroundColor: colors.surface }, sliderStyle]} />
+            <TouchableOpacity
+                style={styles.toggleBtn}
+                onPress={() => handleIndexChange(0)}
+                activeOpacity={0.8}
             >
-                <ScrollView contentContainerStyle={styles.content}>
-                    <Text style={styles.header}>Contribute</Text>
+                <Ionicons
+                    name="add-circle"
+                    size={18}
+                    color={index === 0 ? colors.primary : colors.textLight}
+                    style={{ marginRight: 6 }}
+                />
+                <Text style={[
+                    styles.toggleText,
+                    { color: index === 0 ? colors.primary : colors.textLight, fontWeight: index === 0 ? '600' : '500' }
+                ]}>Contribute</Text>
+            </TouchableOpacity>
 
-                    <Text style={styles.label}>Select Dialect</Text>
-                    <View style={styles.chipContainer}>
-                        {DIALECTS.map((d) => (
-                            <DialectChip
-                                key={d}
-                                label={d}
-                                selected={selectedDialect === d}
-                                onPress={() => setSelectedDialect(d)}
-                            />
-                        ))}
-                    </View>
+            <TouchableOpacity
+                style={styles.toggleBtn}
+                onPress={() => handleIndexChange(1)}
+                activeOpacity={0.8}
+            >
+                <Ionicons
+                    name="shield-checkmark"
+                    size={18}
+                    color={index === 1 ? colors.primary : colors.textLight}
+                    style={{ marginRight: 6 }}
+                />
+                <Text style={[
+                    styles.toggleText,
+                    { color: index === 1 ? colors.primary : colors.textLight, fontWeight: index === 1 ? '600' : '500' }
+                ]}>Verify</Text>
+            </TouchableOpacity>
+        </View>
+    );
 
-                    <Input
-                        label="Word"
-                        placeholder="e.g. kitob"
-                        value={word}
-                        onChangeText={setWord}
-                        style={{ marginTop: SPACING.m }}
-                    />
+    const renderScene = ({ route }) => {
+        switch (route.key) {
+            case 'contribute':
+                return (
+                    <KeyboardAvoidingView
+                        style={{ flex: 1 }}
+                        behavior={Platform.OS === "ios" ? "padding" : "height"}
+                    >
+                        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+                            <Text style={[styles.sectionTitle, { color: colors.text }]}>Add New Word</Text>
+                            <Text style={[styles.sectionSubtitle, { color: colors.textLight }]}>
+                                Help preserve the language by adding new vocabulary.
+                            </Text>
 
-                    <Input
-                        label="Meaning (Optional)"
-                        placeholder="e.g. Book"
-                        value={meaning}
-                        onChangeText={setMeaning}
-                    />
-
-                    <Text style={styles.label}>Pronunciation</Text>
-                    <View style={[styles.recorderCard, isRecording && styles.recordingActive]}>
-                        {isRecording ? (
-                            <View style={styles.recordingState}>
-                                <Text style={styles.recordingText}>Recording...</Text>
-                                <Button
-                                    title="Stop"
-                                    onPress={stopRecording}
-                                    variant="danger"
-                                    icon="stop"
-                                    size="small"
-                                />
+                            <Text style={[styles.label, { color: colors.text }]}>Select Dialect</Text>
+                            <View style={styles.chipContainer}>
+                                {contributionDialects.map((d) => (
+                                    <DialectChip
+                                        key={d}
+                                        label={d}
+                                        selected={selectedDialect === d}
+                                        onPress={() => setSelectedDialect(d)}
+                                    />
+                                ))}
                             </View>
-                        ) : (
-                            <View style={styles.recordingState}>
-                                {recordUri ? (
-                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+
+                            <Input
+                                label="Word (Latin Script)"
+                                placeholder="e.g. kitob"
+                                value={word}
+                                onChangeText={setWord}
+                                style={{ marginTop: SPACING.m }}
+                            />
+
+                            <Input
+                                label="Meaning in English (Optional)"
+                                placeholder="e.g. Book"
+                                value={meaning}
+                                onChangeText={setMeaning}
+                            />
+
+                            <Text style={[styles.label, { color: colors.text }]}>Pronunciation (Optional)</Text>
+                            <View style={[
+                                styles.recorderCard,
+                                { backgroundColor: colors.surface, borderColor: colors.border },
+                                isRecording && { borderColor: colors.error, backgroundColor: '#FEF2F2' }
+                            ]}>
+                                {isRecording ? (
+                                    <View style={styles.recordingState}>
+                                        <View style={styles.recordingIndicator}>
+                                            <View style={[styles.recordingDot, { backgroundColor: colors.error }]} />
+                                            <Text style={[styles.recordingText, { color: colors.error }]}>Recording...</Text>
+                                        </View>
                                         <Button
-                                            title="Play Preview"
-                                            onPress={playPreview}
-                                            variant="secondary"
-                                            icon="play"
+                                            title="Stop Recording"
+                                            onPress={handleStopRecording}
+                                            variant="danger"
+                                            icon="stop"
                                             size="small"
-                                            style={{ marginRight: SPACING.s }}
-                                        />
-                                        <Button
-                                            title="Redo"
-                                            onPress={startRecording}
-                                            variant="ghost"
-                                            size="small"
+                                            style={{ width: '100%' }}
                                         />
                                     </View>
                                 ) : (
-                                    <Button
-                                        title="Start Recording"
-                                        onPress={startRecording}
-                                        icon="mic"
-                                    />
+                                    <View style={styles.recordingState}>
+                                        {recordUri ? (
+                                            <View style={styles.previewContainer}>
+                                                <TouchableOpacity onPress={playPreview} style={[styles.playPreviewBtn, { backgroundColor: colors.primary + '15' }]}>
+                                                    <Ionicons name="play" size={24} color={colors.primary} />
+                                                    <Text style={[styles.previewText, { color: colors.primary }]}>Play Preview</Text>
+                                                </TouchableOpacity>
+
+                                                <View style={{ flexDirection: 'row', gap: 8 }}>
+                                                    <TouchableOpacity onPress={handleStartRecording} style={[styles.redoBtn, { backgroundColor: colors.inputBg }]}>
+                                                        <Ionicons name="refresh" size={20} color={colors.textLight} />
+                                                    </TouchableOpacity>
+                                                    <TouchableOpacity onPress={() => setRecordUri(null)} style={[styles.redoBtn, { backgroundColor: colors.error + '15' }]}>
+                                                        <Ionicons name="trash" size={20} color={colors.error} />
+                                                    </TouchableOpacity>
+                                                </View>
+                                            </View>
+                                        ) : (
+                                            <View style={styles.startRecordContainer}>
+                                                <TouchableOpacity
+                                                    style={[styles.bigMicBtn, { backgroundColor: colors.primary + '10', borderColor: colors.primary }]}
+                                                    onPress={handleStartRecording}
+                                                >
+                                                    <Ionicons name="mic" size={32} color={colors.primary} />
+                                                </TouchableOpacity>
+                                                <Text style={[styles.micHint, { color: colors.textLight }]}>Tap to record pronunciation</Text>
+                                            </View>
+                                        )}
+                                    </View>
                                 )}
                             </View>
-                        )}
-                    </View>
 
-                    <Button
-                        title="Submit Contribution"
-                        onPress={handleSubmit}
-                        loading={uploading}
-                        disabled={!word || !recordUri}
-                        style={{ marginTop: SPACING.xl }}
-                    />
-                </ScrollView>
-            </KeyboardAvoidingView>
+                            <Button
+                                title="Submit Contribution"
+                                onPress={handleSubmit}
+                                loading={uploading}
+                                disabled={!word}
+                                style={{ marginTop: SPACING.xl, marginBottom: SPACING.xl }}
+                                variant="primary"
+                                icon="cloud-upload"
+                            />
+                        </ScrollView>
+                    </KeyboardAvoidingView>
+                );
+            case 'verify':
+                return <ReviewScreen embedded={true} />;
+            default:
+                return null;
+        }
+    };
+
+    return (
+        <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
+            <View style={styles.headerContainer}>
+                {renderToggle()}
+            </View>
+
+            <TabView
+                navigationState={{ index, routes }}
+                renderScene={renderScene}
+                onIndexChange={handleIndexChange}
+                initialLayout={{ width: layout.width }}
+                swipeEnabled={true}
+                renderTabBar={() => null}
+                keyboardDismissMode="none"
+            />
+
+            <ActionModal
+                visible={modal.visible}
+                type={modal.type}
+                title={modal.title}
+                message={modal.message}
+                points={modal.points}
+                primaryActionLabel={modal.primaryActionLabel}
+                onPrimaryAction={modal.onAction}
+            />
         </SafeAreaView>
     );
 }
@@ -256,21 +469,64 @@ export default function AddWordScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: COLORS.background,
+    },
+    headerContainer: {
+        paddingHorizontal: SPACING.l,
+        paddingTop: SPACING.s,
+        paddingBottom: SPACING.s,
+    },
+    toggleContainer: {
+        flexDirection: 'row',
+        padding: 4,
+        borderRadius: LAYOUT.borderRadius.l,
+        position: 'relative',
+    },
+    slider: {
+        position: 'absolute',
+        top: 4,
+        left: 4,
+        bottom: 4,
+        width: '50%',
+        borderRadius: LAYOUT.borderRadius.m,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3,
+    },
+    toggleBtn: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 10,
+        borderRadius: LAYOUT.borderRadius.m,
+        zIndex: 1,
+    },
+    toggleText: {
+        fontSize: 14,
+    },
+    mainContent: {
+        flex: 1,
     },
     content: {
         padding: SPACING.l,
     },
-    header: {
-        ...TYPOGRAPHY.header,
+    sectionTitle: {
+        fontSize: 24,
+        fontWeight: '700',
+        marginBottom: 4,
+    },
+    sectionSubtitle: {
+        fontSize: 14,
         marginBottom: SPACING.l,
+        opacity: 0.7,
     },
     label: {
         fontSize: 14,
         fontWeight: '600',
-        color: COLORS.text,
         marginBottom: SPACING.s,
-        marginTop: SPACING.s,
+        marginTop: SPACING.m,
     },
     chipContainer: {
         flexDirection: 'row',
@@ -278,26 +534,75 @@ const styles = StyleSheet.create({
         rowGap: 8,
     },
     recorderCard: {
-        backgroundColor: COLORS.surface,
-        borderRadius: LAYOUT.borderRadius.m,
+        borderRadius: LAYOUT.borderRadius.l,
         padding: SPACING.l,
         alignItems: 'center',
         borderWidth: 1,
-        borderColor: COLORS.border,
         borderStyle: 'dashed',
-    },
-    recordingActive: {
-        borderColor: COLORS.error,
-        backgroundColor: '#FEF2F2', // Light red
+        marginTop: SPACING.xs,
+        minHeight: 140,
+        justifyContent: 'center',
     },
     recordingState: {
         width: '100%',
         alignItems: 'center',
         justifyContent: 'center',
     },
+    recordingIndicator: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: SPACING.m,
+    },
+    recordingDot: {
+        width: 10,
+        height: 10,
+        borderRadius: 5,
+        marginRight: 8,
+    },
     recordingText: {
-        color: COLORS.error,
         fontWeight: '600',
-        marginBottom: SPACING.s,
+        fontSize: 16,
+    },
+    startRecordContainer: {
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    bigMicBtn: {
+        width: 64,
+        height: 64,
+        borderRadius: 32,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        marginBottom: 12,
+    },
+    micHint: {
+        fontSize: 14,
+    },
+    previewContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        width: '100%',
+    },
+    playPreviewBtn: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 12,
+        borderRadius: LAYOUT.borderRadius.m,
+        marginRight: 12,
+    },
+    previewText: {
+        fontSize: 16,
+        fontWeight: '600',
+        marginLeft: 8,
+    },
+    redoBtn: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        alignItems: 'center',
+        justifyContent: 'center',
     }
 });

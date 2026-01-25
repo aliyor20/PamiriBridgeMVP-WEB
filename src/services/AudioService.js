@@ -97,3 +97,48 @@ export const clearAudioCache = async () => {
         return false;
     }
 };
+
+/**
+ * Start recording audio
+ * @returns {Promise<{recording: Audio.Recording, uri: string | null}>}
+ */
+export const startRecording = async () => {
+    try {
+        const permission = await Audio.requestPermissionsAsync();
+        if (permission.status !== 'granted') {
+            throw new Error('Permission not granted');
+        }
+
+        await Audio.setAudioModeAsync({
+            allowsRecordingIOS: true,
+            playsInSilentModeIOS: true,
+        });
+
+        const { recording } = await Audio.Recording.createAsync(
+            Audio.RecordingOptionsPresets.HIGH_QUALITY
+        );
+
+        return recording;
+    } catch (err) {
+        console.error('Failed to start recording', err);
+        throw err;
+    }
+};
+
+/**
+ * Stop recording
+ * @param {Audio.Recording} recording 
+ * @returns {Promise<string>} uri of the recorded file
+ */
+export const stopRecording = async (recording) => {
+    if (!recording) return null;
+
+    try {
+        await recording.stopAndUnloadAsync();
+        const uri = recording.getURI();
+        return uri;
+    } catch (error) {
+        console.error('Failed to stop recording', error);
+        return null;
+    }
+};
