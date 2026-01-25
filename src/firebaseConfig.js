@@ -5,12 +5,12 @@ import { getStorage } from 'firebase/storage';
 
 // REPLACE the values below with the keys you copied from the Firebase Console earlier
 const firebaseConfig = {
-    apiKey: "AIzaSyCh8xj5oZfFk4NyhKWAuN8joLCFB84QaCM",
-    authDomain: "pamirilexicon.firebaseapp.com",
-    projectId: "pamirilexicon",
-    storageBucket: "pamirilexicon.firebasestorage.app",
-    messagingSenderId: "415283491828",
-    appId: "1:415283491828:web:7c2c737ac51e7b68fdffa1"
+    apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
+    authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
+    projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
+    storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET,
+    messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+    appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID
 };
 
 // Initialize Firebase
