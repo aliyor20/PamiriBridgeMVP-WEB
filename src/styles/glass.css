@@ -1,0 +1,72 @@
+:root {
+    --glass-blur: 24px;
+    --glass-saturate: 180%;
+    --radius-lg: 20px;
+    --radius-md: 12px;
+    --radius-sm: 8px;
+
+    /* Noise Texture (Inline SVG Data URI) */
+    --noise-pattern: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+}
+
+.glass-panel {
+    /* 1. The Base: Adaptive color mix */
+    background: color-mix(in srgb, var(--color-surface) 70%, transparent);
+
+    /* 2. The Blur */
+    backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+
+    /* 3. The Specular Border (Top-light, Bottom-dark) */
+    box-shadow:
+        inset 0 1px 0 0 rgba(255, 255, 255, 0.2),
+        inset 0 -1px 0 0 rgba(0, 0, 0, 0.1),
+        0 8px 32px rgba(0, 0, 0, 0.1);
+
+    /* 4. Formatting */
+    position: relative;
+    border-radius: var(--radius-lg);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    /* Fallback border if shadow is too subtle */
+}
+
+/* Adjust specularity for dark mode */
+@media (prefers-color-scheme: dark) {
+    .glass-panel {
+        box-shadow:
+            inset 0 1px 0 0 rgba(255, 255, 255, 0.1),
+            inset 0 -1px 0 0 rgba(0, 0, 0, 0.3),
+            0 8px 32px rgba(0, 0, 0, 0.3);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+}
+
+/* Noise Overlay via Pseudo-element */
+.glass-panel::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image: var(--noise-pattern);
+    opacity: 0.4;
+    /* Adjusted for visibility against the new SVG */
+    pointer-events: none;
+    border-radius: inherit;
+    z-index: 0;
+    mix-blend-mode: overlay;
+}
+
+/* Ensure content sits above noise */
+.glass-panel>* {
+    position: relative;
+    z-index: 1;
+}
+
+/* Hover Shift Effect */
+.hover-shift {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.hover-shift:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+}

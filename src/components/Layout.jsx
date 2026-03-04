@@ -1,0 +1,219 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { Outlet, Link, NavLink, useLocation } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
+import { useHaptic } from '../hooks/useHaptic';
+import Joyride, { STATUS } from 'react-joyride';
+import ThemeToggle from './ThemeToggle';
+import { Search, Home as HomeIcon, BarChart2, ShieldCheck, User, Plus, Settings } from 'lucide-react';
+import { InstallPromptModal, GlobalInstallBanner } from './InstallPrompts';
+import '../styles/global.css';
+
+export default function Layout() {
+    const { user, userProfile, loginWithGoogle } = useAuth();
+    const { t } = useLanguage();
+    const [runTour, setRunTour] = useState(false);
+    const lastScrollY = useRef(0);
+    const haptic = useHaptic();
+    const location = useLocation();
+    const isElderOrHigher = userProfile && ['elder', 'guide', 'pioneer'].includes(userProfile.role);
+
+    useEffect(() => {
+        if (localStorage.getItem('pb_start_tour') === 'true') {
+            localStorage.removeItem('pb_start_tour');
+            setTimeout(() => setRunTour(true), 500);
+        }
+    }, [location.pathname]);
+
+    const tourSteps = [
+        {
+            target: '.tour-search',
+            content: (
+                <div style={{ textAlign: 'center', padding: '10px' }}>
+                    <h3 className="serif" style={{ fontSize: '1.4rem', marginBottom: '12px', color: 'var(--color-primary)' }}>Welcome to Pamiri Bridge</h3>
+                    <p style={{ fontSize: '1rem', color: 'var(--color-text-light)', lineHeight: '1.5' }}>
+                        Our mission is to build a digital home for the Pamiri languages. Prepare to track your impact, earn Karma, and help preserve our heritage.
+                    </p>
+                </div>
+            ),
+            disableBeacon: true,
+        },
+        {
+            target: '.tour-nav-contribute',
+            content: 'Help us build the bridge by submitting new words into the Verification Queue. (Coming Soon)',
+        },
+        {
+            target: '.tour-nav-stats',
+            content: 'Track your impact, earn Karma points, and rise through the ranks! (Coming Soon)',
+        }
+    ];
+
+    const handleJoyrideCallback = (data) => {
+        const { status } = data;
+        if ([STATUS.FINISHED, STATUS.SKIPPED].includes(status)) {
+            setRunTour(false);
+        }
+    };
+
+    // Scroll logic removed so nav stays visible
+
+    const isExploreView = location.pathname === '/explore' || (location.pathname === '/' && !user && localStorage.getItem('pb_explore_mode') === 'true');
+
+    return (
+        <div className="layout">
+            <GlobalInstallBanner />
+            <Joyride
+                steps={tourSteps}
+                run={runTour}
+                continuous={true}
+                showSkipButton={true}
+                showProgress={true}
+                callback={handleJoyrideCallback}
+                floaterProps={{
+                    styles: {
+                        floater: {
+                            filter: 'drop-shadow(0 12px 40px rgba(0,0,0,0.5))',
+                        }
+                    }
+                }}
+                styles={{
+                    options: {
+                        primaryColor: '#00897b',
+                        backgroundColor: 'transparent',
+                        textColor: '#fff',
+                        arrowColor: 'rgba(255, 255, 255, 0.1)'
+                    },
+                    tooltipContainer: {
+                        textAlign: 'left'
+                    },
+                    tooltip: {
+                        backdropFilter: 'blur(24px)',
+                        WebkitBackdropFilter: 'blur(24px)',
+                        borderRadius: '24px',
+                        border: '1px solid rgba(255,255,255,0.2)',
+                        padding: '24px',
+                        background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%)',
+                        color: 'var(--color-text)'
+                    },
+                    buttonNext: {
+                        backgroundColor: 'var(--color-primary)',
+                        borderRadius: '50px',
+                        padding: '10px 20px',
+                        fontWeight: 'bold',
+                        color: '#fff'
+                    },
+                    buttonBack: {
+                        color: 'var(--color-text-light)',
+                        marginRight: 10
+                    },
+                    buttonSkip: {
+                        color: 'var(--color-text-light)',
+                    }
+                }}
+            />
+
+            {/* Mobile Top Bar (Simplified - Text Removed based on feedback) */}
+            <header className="mobile-header" style={{ height: 'env(safe-area-inset-top, 20px)' }}>
+            </header>
+
+            {/* Desktop Header */}
+            {!isExploreView && (
+                <header className="desktop-header glass-panel">
+                    <div className="container-large header-content">
+                        <Link to="/" className="logo">
+                            Pamiri Bridge
+                        </Link>
+
+                        <nav className="desktop-nav">
+                            <NavLink to="/" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>
+                                {t('nav.home')}
+                            </NavLink>
+                            <NavLink to="/stats" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>
+                                Stats
+                            </NavLink>
+                            {isElderOrHigher && (
+                                <NavLink to="/verification" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>
+                                    Verification
+                                </NavLink>
+                            )}
+
+                            <div style={{ marginLeft: '8px', marginRight: '8px' }}>
+                                <ThemeToggle />
+                            </div>
+
+                            {user ? (
+                                <Link to="/profile" className="profile-link">
+                                    <img
+                                        src={user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(userProfile?.displayName || user.email)}&background=random`}
+                                        alt="Profile"
+                                        className="avatar-small"
+                                    />
+                                </Link>
+                            ) : (
+                                <Link to="/login" className="login-btn" style={{ textDecoration: 'none' }}>
+                                    Log In
+                                </Link>
+                            )}
+                        </nav>
+                    </div>
+                </header>
+            )}
+
+            <main className="main-content">
+                <Outlet />
+            </main>
+
+            {/* Floating Dock (Mobile) ONLY if User is logged in */}
+            {user && (
+                <nav
+                    className="mobile-nav glass-panel"
+                    role="navigation"
+                >
+                    <MobileNavItem to="/" icon={<HomeIcon size={24} />} label={t('nav.home')} haptic={haptic} className="tour-nav-home" />
+                    <MobileNavItem to="/stats" icon={<BarChart2 size={24} />} label="Stats" haptic={haptic} className="tour-nav-stats" />
+
+                    {/* Contribute Button (Center) */}
+                    <div className="nav-item-center tour-nav-contribute" style={{ position: 'relative', top: '-24px' }}>
+                        <Link
+                            to="/contribute"
+                            onClick={() => haptic && haptic('medium')}
+                            className="glass-panel"
+                            style={{
+                                width: '56px',
+                                height: '56px',
+                                backgroundColor: 'var(--color-primary)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                borderRadius: '50%',
+                                color: 'white',
+                                boxShadow: '0 8px 16px rgba(0,0,0,0.3)',
+                                transform: 'rotate(0deg)',
+                                transition: 'transform 0.2s'
+                            }}
+                        >
+                            <Plus size={32} />
+                        </Link>
+                    </div>
+
+                    <MobileNavItem to="/settings" icon={<Settings size={24} />} label="Settings" haptic={haptic} />
+                    <MobileNavItem to="/profile" icon={<User size={24} />} label={t('nav.profile')} haptic={haptic} />
+                </nav>
+            )}
+        </div>
+    );
+}
+
+function MobileNavItem({ to, icon, label, haptic, className = "" }) {
+    return (
+        <NavLink
+            to={to}
+            className={({ isActive }) => `nav-link ${className} ${isActive ? 'active' : ''}`}
+            onClick={() => haptic && haptic('light')}
+            style={{ textDecoration: 'none' }}
+        >
+            <span className="nav-icon">{icon}</span>
+            <span className="nav-label">{label}</span>
+        </NavLink>
+    );
+}
