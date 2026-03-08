@@ -12,12 +12,21 @@ export async function fetchDeltasFromFirestore(lastSyncTimestamp) {
     try {
         const dictionaryRef = collection(db, 'dictionary');
 
+        // Firestore strictly expects Date objects to compare against Timestamps accurately
+        // It will fail if comparing a Number against a Timestamp.
+        let safeDateToCompare = lastSyncTimestamp;
+        if (typeof lastSyncTimestamp === 'number' || typeof lastSyncTimestamp === 'string') {
+            safeDateToCompare = new Date(lastSyncTimestamp);
+        } else if (lastSyncTimestamp?.toDate) {
+            safeDateToCompare = lastSyncTimestamp.toDate();
+        }
+
         // Ensure we only grab verified words, ordered by oldest first after the last sync point.
         // Limit to 20 to prevent accidental massive reads if the sync falls way behind or bugs out.
         const q = query(
             dictionaryRef,
             where('status', '==', 'verified'),
-            where('updatedAt', '>', lastSyncTimestamp),
+            where('updatedAt', '>', safeDateToCompare),
             orderBy('updatedAt', 'asc'),
             limit(20)
         );

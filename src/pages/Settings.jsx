@@ -4,12 +4,21 @@ import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
 import ThemeToggle from '../components/ThemeToggle';
 import { LogOut, Palette, Info, Compass, Globe } from 'lucide-react';
+import { DIALECTS } from '../lib/api';
 import '../styles/glass.css';
 
 export default function Settings() {
-    const { logout } = useAuth();
+    const { logout, userProfile, updateUserDialect } = useAuth();
     const navigate = useNavigate();
     const { t, language, setLanguage } = useLanguage();
+
+    const [selectedDialect, setSelectedDialect] = useState(userProfile?.dialect || 'Shughni');
+
+    useEffect(() => {
+        if (userProfile?.dialect) {
+            setSelectedDialect(userProfile.dialect);
+        }
+    }, [userProfile]);
 
     const handleStartTour = () => {
         localStorage.setItem('pb_start_tour', 'true');
@@ -18,6 +27,13 @@ export default function Settings() {
 
     const handleLanguageChange = (lang) => {
         setLanguage(lang);
+    };
+
+    const handleDialectChange = async (dialect) => {
+        setSelectedDialect(dialect);
+        if (updateUserDialect) {
+            await updateUserDialect(dialect);
+        }
     };
 
     return (
@@ -44,10 +60,12 @@ export default function Settings() {
             <div className="settings-section" style={{ marginTop: '3rem' }}>
                 <div className="settings-header">
                     <Globe size={20} color="var(--color-text)" />
-                    <h2 className="serif">{t('settings.app_language')}</h2>
+                    <h2 className="serif">{t('settings.app_language') || 'Language'}</h2>
                 </div>
+
+                {/* App Interface Language */}
                 <div className="glass-panel" style={{ padding: '1.5rem', marginTop: '1rem' }}>
-                    <h3 style={{ margin: 0, fontSize: '1.1rem', color: 'var(--color-text)' }}>{t('settings.native_language')}</h3>
+                    <h3 style={{ margin: 0, fontSize: '1.1rem', color: 'var(--color-text)' }}>Interface Language</h3>
                     <p style={{ color: 'var(--color-text-light)', margin: '0.5rem 0 1rem 0', fontSize: '0.85rem' }}>
                         {t('settings.language_desc')}
                     </p>
@@ -57,14 +75,41 @@ export default function Settings() {
                             className={`pill-btn ${language === 'en' ? 'active' : ''}`}
                             onClick={() => handleLanguageChange('en')}
                         >
-                            {t('settings.english')}
+                            English
                         </button>
                         <button
                             className={`pill-btn ${language === 'ru' ? 'active' : ''}`}
                             onClick={() => handleLanguageChange('ru')}
                         >
-                            {t('settings.russian')}
+                            Русский
                         </button>
+                    </div>
+                </div>
+
+                {/* Default Dialect Selector */}
+                <div className="glass-panel" style={{ padding: '1.5rem', marginTop: '1rem' }}>
+                    <h3 style={{ margin: 0, fontSize: '1.1rem', color: 'var(--color-text)' }}>Default Dialect</h3>
+                    <p style={{ color: 'var(--color-text-light)', margin: '0.5rem 0 1rem 0', fontSize: '0.85rem' }}>
+                        Select the Pamiri dialect you are most comfortable translating.
+                    </p>
+
+                    <div className="pill-selector" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', background: 'transparent', padding: '0', border: 'none' }}>
+                        {DIALECTS.filter(d => d !== 'All').map((dialect) => (
+                            <button
+                                key={dialect}
+                                className={`pill-btn ${selectedDialect === dialect ? 'active' : ''}`}
+                                onClick={() => handleDialectChange(dialect)}
+                                style={{
+                                    flex: '0 1 auto',
+                                    padding: '8px 16px',
+                                    border: '1px solid var(--color-border)',
+                                    background: selectedDialect === dialect ? 'var(--color-surface)' : 'rgba(255,255,255,0.02)',
+                                    color: selectedDialect === dialect ? 'var(--color-primary)' : 'var(--color-text-light)'
+                                }}
+                            >
+                                {dialect}
+                            </button>
+                        ))}
                     </div>
                 </div>
             </div>

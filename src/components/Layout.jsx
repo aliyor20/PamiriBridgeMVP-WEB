@@ -14,10 +14,36 @@ export default function Layout() {
     const { user, userProfile, loginWithGoogle } = useAuth();
     const { t } = useLanguage();
     const [runTour, setRunTour] = useState(false);
+    const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
     const lastScrollY = useRef(0);
     const haptic = useHaptic();
     const location = useLocation();
     const isElderOrHigher = userProfile && ['elder', 'guide', 'pioneer'].includes(userProfile.role);
+
+    useEffect(() => {
+        if (localStorage.getItem('pb_start_tour') === 'true') {
+            localStorage.removeItem('pb_start_tour');
+            setTimeout(() => setRunTour(true), 500);
+        }
+    }, [location.pathname]);
+
+    // Keyboard detection logic for mobile
+    useEffect(() => {
+        const handleResize = () => {
+            if (window.visualViewport) {
+                // If height shrinks significantly (e.g. >25%), keyboard is likely open
+                const isShrunk = window.visualViewport.height < window.innerHeight * 0.75;
+                setIsKeyboardOpen(isShrunk);
+            }
+        };
+
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', handleResize);
+            // Initial check
+            handleResize();
+            return () => window.visualViewport.removeEventListener('resize', handleResize);
+        }
+    }, []);
 
     useEffect(() => {
         if (localStorage.getItem('pb_start_tour') === 'true') {
@@ -240,32 +266,40 @@ export default function Layout() {
                     <nav
                         className="mobile-nav glass-panel"
                         role="navigation"
+                        style={{
+                            transform: isKeyboardOpen ? 'translateY(150%)' : 'translateY(0)',
+                            transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                            opacity: isKeyboardOpen ? 0 : 1,
+                            pointerEvents: isKeyboardOpen ? 'none' : 'auto'
+                        }}
                     >
                         <MobileNavItem to="/" icon={<HomeIcon size={24} />} label={t('nav.home')} haptic={haptic} className="tour-nav-home" />
                         <MobileNavItem to="/stats" icon={<BarChart2 size={24} />} label="Stats" haptic={haptic} className="tour-nav-stats" />
 
                         {/* Contribute Button (Center) */}
-                        <div className="nav-item-center tour-nav-contribute" style={{ position: 'relative', top: '-24px' }}>
+                        <div className="nav-item-center tour-nav-contribute" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: '-12px' }}>
                             <Link
                                 to="/contribute"
                                 onClick={() => haptic && haptic('medium')}
                                 className="glass-panel"
                                 style={{
-                                    width: '56px',
-                                    height: '56px',
-                                    backgroundColor: 'var(--color-primary)',
+                                    width: '46px',
+                                    height: '46px',
+                                    backgroundColor: 'var(--color-surface)',
+                                    border: '1px solid rgba(0, 137, 123, 0.4)', // subtle primary border
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
-                                    borderRadius: '50%',
-                                    color: 'white',
-                                    boxShadow: '0 8px 16px rgba(0,0,0,0.3)',
-                                    transform: 'rotate(0deg)',
-                                    transition: 'transform 0.2s'
+                                    borderRadius: '16px',
+                                    color: 'var(--color-primary-light)',
+                                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+                                    marginBottom: '4px',
+                                    textDecoration: 'none'
                                 }}
                             >
-                                <Plus size={32} />
+                                <Plus size={24} />
                             </Link>
+                            <span style={{ fontSize: '10px', color: 'var(--color-primary-light)', fontWeight: '600' }}>Contribute</span>
                         </div>
 
                         <MobileNavItem to="/settings" icon={<Settings size={24} />} label="Settings" haptic={haptic} />

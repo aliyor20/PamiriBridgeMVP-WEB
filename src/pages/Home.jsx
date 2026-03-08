@@ -9,6 +9,7 @@ import { Search } from 'lucide-react';
 import { InstallPromptBanner } from '../components/InstallPrompts';
 import AudioWaveform from '../components/AudioWaveform';
 import QuizWidget from '../components/QuizWidget';
+import ActionWidget from '../components/ActionWidget';
 import '../styles/global.css';
 
 export default function Home() {
@@ -214,32 +215,13 @@ function HomeUser({ user, profile, term, setTerm, results, isSearching, isDeskto
                     <h2 className="serif" style={{ marginBottom: '1rem', color: 'var(--color-primary)' }}>
                         {greeting}, {firstName}
                     </h2>
+
                     <SearchSection term={term} setTerm={setTerm} results={results} isSearching={isSearching} />
                 </div>
 
                 {(isDesktop || (results.length === 0 && !term)) && (
                     <div className="sidebar-col">
-                        <div className="dashboard-card glass-panel" style={{ marginBottom: '1rem', borderTop: '4px solid var(--color-primary)' }}>
-                            <h3 className="serif" style={{ fontSize: '1.2rem', marginBottom: '0.5rem' }}>Contributions</h3>
-                            <p style={{ fontSize: '0.9rem', color: 'var(--color-text-light)', marginBottom: '1rem' }}>
-                                Help us grow the dictionary by adding new Pamiri words and phrases.
-                            </p>
-                            <Link to="/contribute" className="btn-primary" style={{ display: 'block', textAlign: 'center', padding: '10px', borderRadius: '8px', textDecoration: 'none', fontWeight: 'bold' }}>
-                                Add New Word
-                            </Link>
-                        </div>
-
-                        {['elder', 'guide', 'pioneer'].includes(profile?.role) && (
-                            <div className="dashboard-card glass-panel" style={{ marginBottom: '1rem', borderLeft: '4px solid var(--color-secondary)' }}>
-                                <h3 className="serif" style={{ fontSize: '1.2rem', marginBottom: '0.5rem' }}>Verification Queue</h3>
-                                <p style={{ fontSize: '0.9rem', color: 'var(--color-text-light)', marginBottom: '1rem' }}>
-                                    Review pending community entries.
-                                </p>
-                                <Link to="/verification" className="btn-secondary" style={{ display: 'block', textAlign: 'center', padding: '10px', borderRadius: '8px', textDecoration: 'none', background: 'rgba(255,255,255,0.1)', color: 'white' }}>
-                                    Start Verifying
-                                </Link>
-                            </div>
-                        )}
+                        <ActionWidget />
 
                         <QuizWidget />
 

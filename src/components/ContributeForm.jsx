@@ -69,6 +69,7 @@ export default function ContributeForm() {
         try {
             await submitContribution({
                 word,
+                meaning: meaningEN.trim() || meaningRU.trim(), // Force backward-compatibility
                 definitions: {
                     ...(meaningEN.trim() && { en: meaningEN.trim() }),
                     ...(meaningRU.trim() && { ru: meaningRU.trim() })

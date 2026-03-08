@@ -69,12 +69,12 @@ export const DictionaryProvider = ({ children }) => {
                     // Update Metadata
                     meta = {
                         version: dictData.version,
-                        updated_at: dictData.updated_at,
-                        entry_count: dictData.entries.length,
-                        last_delta_timestamp: dictData.updated_at
+                        updated_at: dictData.lastUpdated || dictData.updated_at,
+                        entry_count: dictData.count || dictData.entries.length,
+                        last_delta_timestamp: dictData.lastUpdated || dictData.updated_at
                     };
                     await idb.setLocalVersion(meta);
-                    lastDeltaTimestamp = dictData.updated_at;
+                    lastDeltaTimestamp = dictData.lastUpdated || dictData.updated_at;
 
                     console.log('Sync Complete.');
                 }
@@ -92,7 +92,21 @@ export const DictionaryProvider = ({ children }) => {
                     console.log(`Pulled ${deltas.length} new words from Deltas`);
                     await idb.bulkPutEntries(deltas);
                     meta = await idb.getLocalVersion();
-                    meta.last_delta_timestamp = deltas[deltas.length - 1].updatedAt;
+
+                    // Convert Firestore Timestamp to milliseconds for clean local storage
+                    const newestDelta = deltas[deltas.length - 1];
+                    let deltaMs = meta.last_delta_timestamp;
+                    if (newestDelta.updatedAt) {
+                        if (newestDelta.updatedAt.toMillis) {
+                            deltaMs = newestDelta.updatedAt.toMillis();
+                        } else if (newestDelta.updatedAt.seconds) {
+                            deltaMs = newestDelta.updatedAt.seconds * 1000;
+                        } else if (newestDelta.updatedAt instanceof Date) {
+                            deltaMs = newestDelta.updatedAt.getTime();
+                        }
+                    }
+                    meta.last_delta_timestamp = deltaMs;
+
                     meta.entry_count = meta.entry_count ? meta.entry_count + deltas.length : deltas.length;
                     await idb.setLocalVersion(meta);
                 }

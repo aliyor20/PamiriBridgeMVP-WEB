@@ -91,8 +91,20 @@ export const AuthProvider = ({ children }) => {
         await signOut(auth);
     };
 
+    const updateUserDialect = async (dialect) => {
+        if (!user || !userProfile) return;
+        try {
+            const userRef = doc(db, 'users', user.uid);
+            await setDoc(userRef, { dialect }, { merge: true });
+            setUserProfile((prev) => ({ ...prev, dialect }));
+        } catch (error) {
+            console.error("Failed to update user dialect:", error);
+            throw error;
+        }
+    };
+
     return (
-        <AuthContext.Provider value={{ user, userProfile, loading, loginWithGoogle, signUpWithEmail, loginWithEmail, logout }}>
+        <AuthContext.Provider value={{ user, userProfile, loading, loginWithGoogle, signUpWithEmail, loginWithEmail, logout, updateUserDialect }}>
             {!loading && children}
         </AuthContext.Provider>
     );
