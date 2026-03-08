@@ -5,13 +5,13 @@ import '../styles/glass.css';
 
 // Themes mapping matching themes.css
 const themes = [
-    { id: 'pamiri', name: 'Pamiri Gold', color: '#00897B' }, // Teal/Gold
-    { id: 'badakhshan', name: 'Badakhshan', color: '#D32F2F' }, // Red
-    { id: 'wakhan', name: 'Wakhan', color: '#5D4037' }, // Brown/Mountain
-    { id: 'bartang', name: 'Bartang', color: '#1976D2' }, // Blue/River
+    { id: 'pamiri', name: 'Pamiri Green', color: '#00897B' }, // Teal/Green
+    { id: 'badakhshan', name: 'Badakhshan', color: '#f44336' }, // Vibrant Red
+    { id: 'wakhan', name: 'Wakhan', color: '#ff9800' }, // Vibrant Amber
+    { id: 'bartang', name: 'Bartang', color: '#2196f3' }, // Vibrant Blue
+    { id: 'murghab', name: 'Murghab', color: '#00bcd4' }, // Vibrant Cyan
+    { id: 'ishkashim', name: 'Ishkashim', color: '#9c27b0' }, // Vibrant Purple
     { id: 'oled', name: 'OLED', color: '#000000' }, // Black
-    { id: 'print', name: 'Print', color: '#F5F5F5' }, // White/Paper
-    { id: 'retro', name: 'Retro', color: '#FFB74D' }, // Orange/Sepia
 ];
 
 export default function ThemeToggle() {
@@ -54,7 +54,7 @@ export default function ThemeToggle() {
                 <>
                     {/* Backdrop to close on click outside */}
                     <div
-                        style={{ position: 'fixed', inset: 0, zIndex: 100 }}
+                        style={{ position: 'fixed', inset: 0, zIndex: 9998 }}
                         onClick={() => setIsOpen(false)}
                     />
 
@@ -67,7 +67,7 @@ export default function ThemeToggle() {
                             right: 0,
                             width: '240px',
                             padding: '16px',
-                            zIndex: 101,
+                            zIndex: 9999,
                             borderRadius: '16px',
                             animation: 'fadeIn 0.2s ease-out'
                         }}
@@ -92,7 +92,10 @@ export default function ThemeToggle() {
                                         padding: '8px',
                                         border: theme === t.id ? '1px solid var(--color-primary)' : '1px solid var(--color-border)',
                                         borderRadius: '8px',
-                                        background: 'rgba(var(--color-surface-rgb), 0.5)',
+                                        background: 'rgba(0, 0, 0, 0.4)',
+                                        backdropFilter: 'blur(12px)',
+                                        WebkitBackdropFilter: 'blur(12px)',
+                                        color: '#fff',
                                         cursor: 'pointer',
                                         fontSize: '0.8rem',
                                         textAlign: 'left'

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { useWindowSize } from 'react-use';
 import { useDictionary } from '../context/DictionaryContext';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
@@ -16,6 +17,8 @@ export default function Home() {
     const [term, setTerm] = useState('');
     const [results, setResults] = useState([]);
     const [isSearching, setIsSearching] = useState(false);
+    const { width } = useWindowSize();
+    const isDesktop = width >= 768;
 
     // Search Logic
     useEffect(() => {
@@ -48,6 +51,7 @@ export default function Home() {
                         setTerm={setTerm}
                         results={results}
                         isSearching={isSearching}
+                        isDesktop={isDesktop}
                     />
                 </div>
             ) : (
@@ -194,7 +198,7 @@ function HomePublic({ stats, term, setTerm, results, isSearching }) {
     );
 }
 
-function HomeUser({ user, profile, term, setTerm, results, isSearching }) {
+function HomeUser({ user, profile, term, setTerm, results, isSearching, isDesktop }) {
     const { t } = useLanguage();
     const hour = new Date().getHours();
     let greeting = t('home.morning');
@@ -213,8 +217,30 @@ function HomeUser({ user, profile, term, setTerm, results, isSearching }) {
                     <SearchSection term={term} setTerm={setTerm} results={results} isSearching={isSearching} />
                 </div>
 
-                {results.length === 0 && !term && (
+                {(isDesktop || (results.length === 0 && !term)) && (
                     <div className="sidebar-col">
+                        <div className="dashboard-card glass-panel" style={{ marginBottom: '1rem', borderTop: '4px solid var(--color-primary)' }}>
+                            <h3 className="serif" style={{ fontSize: '1.2rem', marginBottom: '0.5rem' }}>Contributions</h3>
+                            <p style={{ fontSize: '0.9rem', color: 'var(--color-text-light)', marginBottom: '1rem' }}>
+                                Help us grow the dictionary by adding new Pamiri words and phrases.
+                            </p>
+                            <Link to="/contribute" className="btn-primary" style={{ display: 'block', textAlign: 'center', padding: '10px', borderRadius: '8px', textDecoration: 'none', fontWeight: 'bold' }}>
+                                Add New Word
+                            </Link>
+                        </div>
+
+                        {['elder', 'guide', 'pioneer'].includes(profile?.role) && (
+                            <div className="dashboard-card glass-panel" style={{ marginBottom: '1rem', borderLeft: '4px solid var(--color-secondary)' }}>
+                                <h3 className="serif" style={{ fontSize: '1.2rem', marginBottom: '0.5rem' }}>Verification Queue</h3>
+                                <p style={{ fontSize: '0.9rem', color: 'var(--color-text-light)', marginBottom: '1rem' }}>
+                                    Review pending community entries.
+                                </p>
+                                <Link to="/verification" className="btn-secondary" style={{ display: 'block', textAlign: 'center', padding: '10px', borderRadius: '8px', textDecoration: 'none', background: 'rgba(255,255,255,0.1)', color: 'white' }}>
+                                    Start Verifying
+                                </Link>
+                            </div>
+                        )}
+
                         <QuizWidget />
 
                         <div className="dashboard-card glass-panel" style={{ marginTop: '1rem' }}>
@@ -232,17 +258,6 @@ function HomeUser({ user, profile, term, setTerm, results, isSearching }) {
                             </Link>
                         </div>
 
-                        {['elder', 'guide', 'pioneer'].includes(profile?.role) && (
-                            <div className="dashboard-card glass-panel" style={{ marginTop: '1rem', borderLeft: '4px solid var(--color-primary)' }}>
-                                <h3 className="serif" style={{ fontSize: '1rem', marginBottom: '0.5rem' }}>Verification Queue</h3>
-                                <p style={{ fontSize: '0.9rem', color: 'var(--color-text-light)', marginBottom: '1rem' }}>
-                                    Help verify new entries.
-                                </p>
-                                <Link to="/verification" className="btn-primary" style={{ display: 'block', textAlign: 'center', fontSize: '0.9rem', padding: '8px' }}>
-                                    Review Pending
-                                </Link>
-                            </div>
-                        )}
                         {/* Global banner handles installs now */}
                     </div>
                 )}

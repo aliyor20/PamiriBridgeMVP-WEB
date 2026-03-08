@@ -7,6 +7,7 @@ import Joyride, { STATUS } from 'react-joyride';
 import ThemeToggle from './ThemeToggle';
 import { Search, Home as HomeIcon, BarChart2, ShieldCheck, User, Plus, Settings } from 'lucide-react';
 import { InstallPromptModal, GlobalInstallBanner } from './InstallPrompts';
+import AnimatedBackground from './AnimatedBackground';
 import '../styles/global.css';
 
 export default function Layout() {
@@ -62,6 +63,7 @@ export default function Layout() {
     return (
         <div className="layout">
             <GlobalInstallBanner />
+            <AnimatedBackground />
             <Joyride
                 steps={tourSteps}
                 run={runTour}
@@ -124,16 +126,64 @@ export default function Layout() {
                             Pamiri Bridge
                         </Link>
 
-                        <nav className="desktop-nav">
-                            <NavLink to="/" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>
-                                {t('nav.home')}
+                        <nav className="desktop-nav" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                            <NavLink
+                                to="/"
+                                className={({ isActive }) => `theme-pill-btn glass-panel ${isActive ? "active" : ""}`}
+                                style={{
+                                    background: 'rgba(255,255,255,0.05)',
+                                    border: '1px solid rgba(255,255,255,0.1)',
+                                    color: 'rgba(255,255,255,0.8)',
+                                    padding: '10px 16px',
+                                    borderRadius: '50px',
+                                    height: '44px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '8px',
+                                    textDecoration: 'none',
+                                    fontSize: '0.9rem'
+                                }}
+                            >
+                                <HomeIcon size={18} /> {t('nav.home')}
                             </NavLink>
-                            <NavLink to="/stats" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>
-                                Stats
+                            <NavLink
+                                to="/stats"
+                                className={({ isActive }) => `theme-pill-btn glass-panel ${isActive ? "active" : ""}`}
+                                style={{
+                                    background: 'rgba(255,255,255,0.05)',
+                                    border: '1px solid rgba(255,255,255,0.1)',
+                                    color: 'rgba(255,255,255,0.8)',
+                                    padding: '10px 16px',
+                                    borderRadius: '50px',
+                                    height: '44px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '8px',
+                                    textDecoration: 'none',
+                                    fontSize: '0.9rem'
+                                }}
+                            >
+                                <BarChart2 size={18} /> Stats
                             </NavLink>
                             {isElderOrHigher && (
-                                <NavLink to="/verification" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>
-                                    Verification
+                                <NavLink
+                                    to="/verification"
+                                    className={({ isActive }) => `theme-pill-btn glass-panel ${isActive ? "active" : ""}`}
+                                    style={{
+                                        background: 'rgba(255,255,255,0.05)',
+                                        border: '1px solid rgba(255,255,255,0.1)',
+                                        color: 'rgba(255,255,255,0.8)',
+                                        padding: '10px 16px',
+                                        borderRadius: '50px',
+                                        height: '44px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '8px',
+                                        textDecoration: 'none',
+                                        fontSize: '0.9rem'
+                                    }}
+                                >
+                                    <ShieldCheck size={18} /> Verification
                                 </NavLink>
                             )}
 
@@ -142,13 +192,34 @@ export default function Layout() {
                             </div>
 
                             {user ? (
-                                <Link to="/profile" className="profile-link">
-                                    <img
-                                        src={user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(userProfile?.displayName || user.email)}&background=random`}
-                                        alt="Profile"
-                                        className="avatar-small"
-                                    />
-                                </Link>
+                                <>
+                                    <NavLink
+                                        to="/settings"
+                                        className={({ isActive }) => `theme-pill-btn glass-panel ${isActive ? "active" : ""}`}
+                                        style={{
+                                            background: 'rgba(255,255,255,0.05)',
+                                            border: '1px solid rgba(255,255,255,0.1)',
+                                            color: 'rgba(255,255,255,0.8)',
+                                            padding: '10px 16px',
+                                            borderRadius: '50px',
+                                            height: '44px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '8px',
+                                            textDecoration: 'none',
+                                            fontSize: '0.9rem'
+                                        }}
+                                    >
+                                        <Settings size={18} /> Settings
+                                    </NavLink>
+                                    <Link to="/profile" className="profile-link">
+                                        <img
+                                            src={user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(userProfile?.displayName || user.email)}&background=random`}
+                                            alt="Profile"
+                                            className="avatar-small"
+                                        />
+                                    </Link>
+                                </>
                             ) : (
                                 <Link to="/login" className="login-btn" style={{ textDecoration: 'none' }}>
                                     Log In
@@ -164,43 +235,45 @@ export default function Layout() {
             </main>
 
             {/* Floating Dock (Mobile) ONLY if User is logged in */}
-            {user && (
-                <nav
-                    className="mobile-nav glass-panel"
-                    role="navigation"
-                >
-                    <MobileNavItem to="/" icon={<HomeIcon size={24} />} label={t('nav.home')} haptic={haptic} className="tour-nav-home" />
-                    <MobileNavItem to="/stats" icon={<BarChart2 size={24} />} label="Stats" haptic={haptic} className="tour-nav-stats" />
+            {
+                user && (
+                    <nav
+                        className="mobile-nav glass-panel"
+                        role="navigation"
+                    >
+                        <MobileNavItem to="/" icon={<HomeIcon size={24} />} label={t('nav.home')} haptic={haptic} className="tour-nav-home" />
+                        <MobileNavItem to="/stats" icon={<BarChart2 size={24} />} label="Stats" haptic={haptic} className="tour-nav-stats" />
 
-                    {/* Contribute Button (Center) */}
-                    <div className="nav-item-center tour-nav-contribute" style={{ position: 'relative', top: '-24px' }}>
-                        <Link
-                            to="/contribute"
-                            onClick={() => haptic && haptic('medium')}
-                            className="glass-panel"
-                            style={{
-                                width: '56px',
-                                height: '56px',
-                                backgroundColor: 'var(--color-primary)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                borderRadius: '50%',
-                                color: 'white',
-                                boxShadow: '0 8px 16px rgba(0,0,0,0.3)',
-                                transform: 'rotate(0deg)',
-                                transition: 'transform 0.2s'
-                            }}
-                        >
-                            <Plus size={32} />
-                        </Link>
-                    </div>
+                        {/* Contribute Button (Center) */}
+                        <div className="nav-item-center tour-nav-contribute" style={{ position: 'relative', top: '-24px' }}>
+                            <Link
+                                to="/contribute"
+                                onClick={() => haptic && haptic('medium')}
+                                className="glass-panel"
+                                style={{
+                                    width: '56px',
+                                    height: '56px',
+                                    backgroundColor: 'var(--color-primary)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    borderRadius: '50%',
+                                    color: 'white',
+                                    boxShadow: '0 8px 16px rgba(0,0,0,0.3)',
+                                    transform: 'rotate(0deg)',
+                                    transition: 'transform 0.2s'
+                                }}
+                            >
+                                <Plus size={32} />
+                            </Link>
+                        </div>
 
-                    <MobileNavItem to="/settings" icon={<Settings size={24} />} label="Settings" haptic={haptic} />
-                    <MobileNavItem to="/profile" icon={<User size={24} />} label={t('nav.profile')} haptic={haptic} />
-                </nav>
-            )}
-        </div>
+                        <MobileNavItem to="/settings" icon={<Settings size={24} />} label="Settings" haptic={haptic} />
+                        <MobileNavItem to="/profile" icon={<User size={24} />} label={t('nav.profile')} haptic={haptic} />
+                    </nav>
+                )
+            }
+        </div >
     );
 }
 

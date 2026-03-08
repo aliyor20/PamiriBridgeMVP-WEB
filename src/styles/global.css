@@ -99,13 +99,14 @@ button {
 
 /* Desktop Header */
 .desktop-header {
-    background-color: var(--color-primary);
+    border-bottom: 1px solid var(--color-border);
     color: white;
     height: var(--header-height);
     position: sticky;
     top: 0;
     z-index: 100;
     display: none;
+    transition: all 0.3s ease;
     /* Hidden on mobile by default */
 }
 
@@ -148,7 +149,8 @@ button {
     transition: color 0.2s;
 }
 
-.desktop-nav .nav-link:hover {
+.desktop-nav .nav-link:hover,
+.desktop-nav .nav-link.active {
     color: white;
 }
 
