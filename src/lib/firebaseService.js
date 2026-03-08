@@ -10,7 +10,7 @@ import { db, storage } from './firebase';
  */
 export async function fetchDeltasFromFirestore(lastSyncTimestamp) {
     try {
-        const dictionaryRef = collection(db, 'dictionary');
+        const dictionaryRef = collection(db, 'entries'); // Use entries where new contributions live
 
         // Firestore strictly expects Date objects to compare against Timestamps accurately
         // It will fail if comparing a Number against a Timestamp.
@@ -26,8 +26,8 @@ export async function fetchDeltasFromFirestore(lastSyncTimestamp) {
         const q = query(
             dictionaryRef,
             where('status', '==', 'verified'),
-            where('updatedAt', '>', safeDateToCompare),
-            orderBy('updatedAt', 'asc'),
+            where('timestamp', '>', safeDateToCompare),
+            orderBy('timestamp', 'asc'),
             limit(20)
         );
 
@@ -127,7 +127,7 @@ export async function voteOnEntry(entryId, voterId, isApproved) {
                 status: newStatus,
                 ...(newStatus === 'verified' && {
                     verifiedAt: serverTimestamp(),
-                    updatedAt: serverTimestamp() // Ensure delta sync catches this as freshly updated
+                    timestamp: serverTimestamp() // Ensure delta sync catches this as freshly updated
                 })
             });
 
