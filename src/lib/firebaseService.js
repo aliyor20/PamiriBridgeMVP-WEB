@@ -125,7 +125,10 @@ export async function voteOnEntry(entryId, voterId, isApproved) {
                 downvotes: newDownvotes,
                 voters: [...(data.voters || []), voterId],
                 status: newStatus,
-                ...(newStatus === 'verified' && { verifiedAt: serverTimestamp() })
+                ...(newStatus === 'verified' && {
+                    verifiedAt: serverTimestamp(),
+                    updatedAt: serverTimestamp() // Ensure delta sync catches this as freshly updated
+                })
             });
 
             // Reward Voter
