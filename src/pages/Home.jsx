@@ -10,6 +10,7 @@ import { InstallPromptBanner } from '../components/InstallPrompts';
 import AudioWaveform from '../components/AudioWaveform';
 import QuizWidget from '../components/QuizWidget';
 import ActionWidget from '../components/ActionWidget';
+import GuidedContributionWidget from '../components/GuidedContributionWidget';
 import '../styles/global.css';
 
 export default function Home() {
@@ -221,6 +222,8 @@ function HomeUser({ user, profile, term, setTerm, results, isSearching, isDeskto
 
                 {(isDesktop || (results.length === 0 && !term)) && (
                     <div className="sidebar-col">
+                        <GuidedContributionWidget />
+                        <div style={{ height: '16px' }}></div>
                         <ActionWidget />
 
                         <QuizWidget />

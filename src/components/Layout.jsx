@@ -18,7 +18,7 @@ export default function Layout() {
     const lastScrollY = useRef(0);
     const haptic = useHaptic();
     const location = useLocation();
-    const isElderOrHigher = userProfile && ['elder', 'guide', 'pioneer'].includes(userProfile.role);
+    const isElderOrHigher = !!userProfile; // Open verification to everyone
 
     useEffect(() => {
         if (localStorage.getItem('pb_start_tour') === 'true') {
@@ -190,6 +190,25 @@ export default function Layout() {
                                 }}
                             >
                                 <BarChart2 size={18} /> Stats
+                            </NavLink>
+                            <NavLink
+                                to="/contribute"
+                                className={({ isActive }) => `theme-pill-btn glass-panel ${isActive ? "active" : ""}`}
+                                style={{
+                                    background: 'rgba(255,255,255,0.05)',
+                                    border: '1px solid rgba(255,255,255,0.1)',
+                                    color: 'rgba(255,255,255,0.8)',
+                                    padding: '10px 16px',
+                                    borderRadius: '50px',
+                                    height: '44px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '8px',
+                                    textDecoration: 'none',
+                                    fontSize: '0.9rem'
+                                }}
+                            >
+                                <Plus size={18} /> Contribute
                             </NavLink>
                             {isElderOrHigher && (
                                 <NavLink

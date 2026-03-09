@@ -2,12 +2,26 @@ import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import * as idb from '../lib/idb';
 import AudioWaveform from '../components/AudioWaveform';
+import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
+import { submitEditProposal } from '../lib/firebaseService';
+import { Edit2, Check, X, Loader } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import '../styles/glass.css';
 
 export default function WordDetail() {
     const { id } = useParams();
     const [entry, setEntry] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+
+    const { user } = useAuth();
+    const { addToast } = useToast();
+
+    // Edit State
+    const [isEditing, setIsEditing] = useState(false);
+    const [editForm, setEditForm] = useState({ word: '', meaning: '' });
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     useEffect(() => {
         async function fetchEntry() {
@@ -22,6 +36,7 @@ export default function WordDetail() {
                     setError("Word not found in local dictionary.");
                 } else {
                     setEntry(data);
+                    setEditForm({ word: data.word || '', meaning: data.meaning || '' });
                 }
             } catch (err) {
                 console.error(err);
@@ -37,6 +52,37 @@ export default function WordDetail() {
     if (loading) return <div className="container" style={{ paddingTop: '2rem' }}>Loading...</div>;
     if (error) return <div className="container" style={{ paddingTop: '2rem', color: 'red' }}>{error} <br /> <Link to="/">Go Home</Link></div>;
     if (!entry) return null;
+
+    const handleEditSubmit = async (e) => {
+        e.preventDefault();
+        if (!user) {
+            addToast("You must be logged in to suggest edits", "error");
+            return;
+        }
+        if (!editForm.word.trim() || !editForm.meaning.trim()) {
+            addToast("Word and meaning are required", "error");
+            return;
+        }
+
+        setIsSubmitting(true);
+        try {
+            await submitEditProposal({
+                originalEntryId: entry.id,
+                originalWord: entry.word,
+                originalMeaning: entry.meaning,
+                suggestedWord: editForm.word.trim(),
+                suggestedMeaning: editForm.meaning.trim(),
+                contributorId: user.uid
+            });
+            addToast("Suggested edit submitted for verification!", "success");
+            setIsEditing(false);
+        } catch (err) {
+            console.error(err);
+            addToast("Failed to submit edit proposal", "error");
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
 
     return (
         <div className="container" style={{ paddingTop: '2rem' }}>
@@ -113,6 +159,86 @@ export default function WordDetail() {
                 <div className="mono" style={{ marginTop: '2rem', fontSize: '0.7rem', color: 'var(--color-text-light)', textAlign: 'right' }}>
                     ID: {entry.id}
                 </div>
+
+                {/* Edit Section */}
+                {user && (
+                    <div style={{ marginTop: '2rem', borderTop: '1px solid var(--color-border)', paddingTop: '1.5rem' }}>
+                        <AnimatePresence mode="wait">
+                            {!isEditing ? (
+                                <motion.div
+                                    key="edit-btn"
+                                    initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                                    style={{ display: 'flex', justifyContent: 'center' }}
+                                >
+                                    <button
+                                        className="btn btn-secondary glass-panel"
+                                        style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+                                        onClick={() => setIsEditing(true)}
+                                    >
+                                        <Edit2 size={16} />
+                                        Suggest Edit
+                                    </button>
+                                </motion.div>
+                            ) : (
+                                <motion.form
+                                    key="edit-form"
+                                    initial={{ opacity: 0, height: 0 }}
+                                    animate={{ opacity: 1, height: 'auto' }}
+                                    exit={{ opacity: 0, height: 0 }}
+                                    onSubmit={handleEditSubmit}
+                                    className="glass-panel"
+                                    style={{ padding: '24px', borderRadius: '16px', overflow: 'hidden' }}
+                                >
+                                    <h3 className="serif" style={{ color: 'var(--color-primary)', marginBottom: '1rem' }}>Suggest an Edit</h3>
+
+                                    <div style={{ marginBottom: '1rem' }}>
+                                        <label style={{ display: 'block', fontSize: '0.9rem', color: 'var(--color-text-light)', marginBottom: '0.5rem' }}>Word</label>
+                                        <input
+                                            type="text"
+                                            className="search-input"
+                                            value={editForm.word}
+                                            onChange={e => setEditForm({ ...editForm, word: e.target.value })}
+                                            required
+                                            style={{ width: '100%', padding: '12px', borderRadius: '8px' }}
+                                        />
+                                    </div>
+
+                                    <div style={{ marginBottom: '1.5rem' }}>
+                                        <label style={{ display: 'block', fontSize: '0.9rem', color: 'var(--color-text-light)', marginBottom: '0.5rem' }}>Meaning</label>
+                                        <textarea
+                                            className="search-input"
+                                            value={editForm.meaning}
+                                            onChange={e => setEditForm({ ...editForm, meaning: e.target.value })}
+                                            required
+                                            rows={3}
+                                            style={{ width: '100%', padding: '12px', borderRadius: '8px', resize: 'vertical' }}
+                                        />
+                                    </div>
+
+                                    <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+                                        <button
+                                            type="button"
+                                            className="btn btn-secondary"
+                                            onClick={() => setIsEditing(false)}
+                                            style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
+                                        >
+                                            <X size={16} /> Cancel
+                                        </button>
+                                        <button
+                                            type="submit"
+                                            className="btn btn-primary"
+                                            disabled={isSubmitting || (editForm.word === entry.word && editForm.meaning === entry.meaning)}
+                                            style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
+                                        >
+                                            {isSubmitting ? <Loader className="spin" size={16} /> : <Check size={16} />}
+                                            Submit Request
+                                        </button>
+                                    </div>
+                                </motion.form>
+                            )}
+                        </AnimatePresence>
+                    </div>
+                )}
             </article>
         </div>
     );

@@ -122,12 +122,27 @@ export const DictionaryProvider = ({ children }) => {
             });
             setFuse(fuseInstance);
 
+            // Calculate dialect counts
+            const dialectCounts = { shughni: 0, rushani: 0, bartangi: 0, yazgulyami: 0, ishkashimi: 0, wakhi: 0, sarykoli: 0 };
+            allEntries.forEach(entry => {
+                const dialect = (entry.dialect || '').toLowerCase();
+                if (dialect.includes('shughni')) dialectCounts.shughni++;
+                else if (dialect.includes('rushan')) dialectCounts.rushani++;
+                else if (dialect.includes('bartang')) dialectCounts.bartangi++;
+                else if (dialect.includes('yazg')) dialectCounts.yazgulyami++;
+                else if (dialect.includes('ishkashim')) dialectCounts.ishkashimi++;
+                else if (dialect.includes('wakhi') || dialect.includes('vakh')) dialectCounts.wakhi++;
+                else if (dialect.includes('sarykol')) dialectCounts.sarykoli++;
+                // If it's empty, or "general", we just don't increment the specific dialect buckets
+            });
+
             // 6. Update Stats
             meta = await idb.getLocalVersion();
             setStats({
                 version: meta?.version || 0,
                 lastUpdated: meta?.updated_at || null,
-                count: meta?.entry_count || 0
+                count: meta?.entry_count || 0,
+                dialects: dialectCounts
             });
 
             setStatus('ready');

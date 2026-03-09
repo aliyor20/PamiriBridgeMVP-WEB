@@ -114,7 +114,17 @@ export default function ContributeForm() {
                         onChange={e => setWord(e.target.value)}
                         placeholder="e.g. Chid"
                         required
-                        style={{ fontSize: '1.2rem', padding: '16px' }}
+                        style={{
+                            width: '100%',
+                            padding: '16px',
+                            borderRadius: '16px',
+                            border: '1px solid rgba(255,255,255,0.1)',
+                            background: 'rgba(0,0,0,0.2)',
+                            color: 'white',
+                            fontSize: '1.2rem',
+                            outline: 'none',
+                            transition: 'all 0.3s ease'
+                        }}
                     />
                 </div>
 
@@ -126,6 +136,17 @@ export default function ContributeForm() {
                         value={meaningEN}
                         onChange={e => setMeaningEN(e.target.value)}
                         placeholder="e.g. Traditional Pamiri House"
+                        style={{
+                            width: '100%',
+                            padding: '14px 16px',
+                            borderRadius: '16px',
+                            border: '1px solid rgba(255,255,255,0.1)',
+                            background: 'rgba(0,0,0,0.2)',
+                            color: 'white',
+                            fontSize: '1.1rem',
+                            outline: 'none',
+                            transition: 'all 0.3s ease'
+                        }}
                     />
                 </div>
 
@@ -137,6 +158,17 @@ export default function ContributeForm() {
                         value={meaningRU}
                         onChange={e => setMeaningRU(e.target.value)}
                         placeholder="e.g. Традиционный памирский дом"
+                        style={{
+                            width: '100%',
+                            padding: '14px 16px',
+                            borderRadius: '16px',
+                            border: '1px solid rgba(255,255,255,0.1)',
+                            background: 'rgba(0,0,0,0.2)',
+                            color: 'white',
+                            fontSize: '1.1rem',
+                            outline: 'none',
+                            transition: 'all 0.3s ease'
+                        }}
                     />
                     <small style={{ color: 'var(--color-text-light)', marginTop: '6px', display: 'block' }}>Provide at least one meaning (English or Russian).</small>
                 </div>
@@ -149,6 +181,18 @@ export default function ContributeForm() {
                         onChange={e => setExample(e.target.value)}
                         placeholder="How is it used in a sentence?"
                         rows="2"
+                        style={{
+                            width: '100%',
+                            padding: '14px 16px',
+                            borderRadius: '16px',
+                            border: '1px solid rgba(255,255,255,0.1)',
+                            background: 'rgba(0,0,0,0.2)',
+                            color: 'white',
+                            fontSize: '1.1rem',
+                            outline: 'none',
+                            transition: 'all 0.3s ease',
+                            resize: 'vertical'
+                        }}
                     />
                 </div>
 
@@ -158,9 +202,21 @@ export default function ContributeForm() {
                         className="glass-input"
                         value={dialect}
                         onChange={e => setDialect(e.target.value)}
+                        style={{
+                            width: '100%',
+                            padding: '14px 16px',
+                            borderRadius: '16px',
+                            border: '1px solid rgba(255,255,255,0.1)',
+                            background: 'rgba(0,0,0,0.2)',
+                            color: 'white',
+                            fontSize: '1.1rem',
+                            outline: 'none',
+                            transition: 'all 0.3s ease',
+                            appearance: 'none'
+                        }}
                     >
                         {contributionDialects.map(d => (
-                            <option key={d} value={d}>{d}</option>
+                            <option key={d} value={d} style={{ color: 'black' }}>{d}</option>
                         ))}
                     </select>
                 </div>

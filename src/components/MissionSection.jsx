@@ -75,7 +75,7 @@ export default function MissionSection() {
                     Our Mission
                 </motion.h2>
 
-                <div style={{ position: 'relative', height: '180px', display: 'flex', justifyContent: 'center', width: '100%' }}>
+                <div className="mission-text-container" style={{ position: 'relative', height: '180px', display: 'flex', justifyContent: 'center', width: '100%' }}>
                     <h3 className="serif" style={{
                         position: 'absolute',
                         width: '100%',
@@ -110,7 +110,10 @@ export default function MissionSection() {
                 }
                 @media (max-width: 600px) {
                     h3.serif {
-                        fontSize: 1.8rem !important;
+                        font-size: 1.8rem !important;
+                    }
+                    .mission-text-container {
+                        height: 250px !important;
                     }
                 }
             `}</style>

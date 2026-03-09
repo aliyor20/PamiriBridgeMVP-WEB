@@ -1,22 +1,23 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 
-const devs = [
-    { name: 'Khorkash', role: 'Lead Architect', avatar: '🐱' },
-    { name: 'Sherbaz', role: 'UI/UX Wizard', avatar: '🦁' },
-    { name: 'Oqila', role: 'Linguistic Expert', avatar: '🦉' },
-    { name: 'Rustam', role: 'Backend Hero', avatar: '🐻' },
-    { name: 'Parvina', role: 'QA Ninja', avatar: '🦊' },
-    { name: 'Khorkash', role: 'Lead Architect', avatar: '🐱' },
-    { name: 'Sherbaz', role: 'UI/UX Wizard', avatar: '🦁' },
-    { name: 'Oqila', role: 'Linguistic Expert', avatar: '🦉' }
+const features = [
+    { name: 'Search', role: 'Find words instantly', avatar: '🔍' },
+    { name: 'Contribute', role: 'Add missing vocabulary', avatar: '✍️' },
+    { name: 'Verify', role: 'Ensure data accuracy', avatar: '✅' },
+    { name: 'Listen', role: 'Native pronunciations', avatar: '🔊' },
+    { name: 'Learn', role: 'Explore idioms & stories', avatar: '📖' },
+    { name: 'Compete', role: 'Climb the leaderboard', avatar: '🏆' },
 ];
+
+// Duplicate for smooth marquee effect
+const marqueeItems = [...features, ...features];
 
 export default function DevsSection() {
     return (
         <section style={{ margin: '5rem 0', position: 'relative', overflow: 'hidden' }}>
             <h2 className="serif" style={{ textAlign: 'center', color: 'var(--color-primary)', fontSize: '2rem', marginBottom: '2rem' }}>
-                Built by the Community
+                Platform Features
             </h2>
 
             {/* Fade edges */}
@@ -41,10 +42,10 @@ export default function DevsSection() {
                 <motion.div
                     className="marquee-track"
                     animate={{ x: ['0%', '-50%'] }}
-                    transition={{ repeat: Infinity, ease: 'linear', duration: 20 }}
+                    transition={{ repeat: Infinity, ease: 'linear', duration: 25 }}
                     style={{ display: 'flex', gap: '2rem' }}
                 >
-                    {devs.map((dev, i) => (
+                    {marqueeItems.map((item, i) => (
                         <div key={i} className="glass-panel" style={{
                             minWidth: '220px',
                             minHeight: '220px',
@@ -81,10 +82,10 @@ export default function DevsSection() {
                                 marginBottom: '1rem',
                                 boxShadow: '0 10px 20px rgba(0,0,0,0.3)'
                             }}>
-                                {dev.avatar}
+                                {item.avatar}
                             </div>
-                            <h4 className="serif" style={{ margin: '0 0 0.5rem 0', fontSize: '1.2rem', color: 'var(--color-text)' }}>{dev.name}</h4>
-                            <p style={{ margin: 0, color: 'var(--color-primary)', fontSize: '0.9rem', fontWeight: 'bold' }}>{dev.role}</p>
+                            <h4 className="serif" style={{ margin: '0 0 0.5rem 0', fontSize: '1.2rem', color: 'var(--color-text)' }}>{item.name}</h4>
+                            <p style={{ margin: 0, color: 'var(--color-primary)', fontSize: '0.9rem', fontWeight: 'bold', textAlign: 'center' }}>{item.role}</p>
                         </div>
                     ))}
                 </motion.div>

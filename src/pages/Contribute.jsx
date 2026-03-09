@@ -1,88 +1,94 @@
 import React, { useState } from 'react';
-import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { Navigate } from 'react-router-dom';
-import { DIALECTS } from '../lib/api';
-
-// We'll extract these to separate components shortly
 import ContributeForm from '../components/ContributeForm';
-import ReviewQueue from '../components/ReviewQueue';
+import GuidedContributionWidget from '../components/GuidedContributionWidget';
+import ActionWidget from '../components/ActionWidget';
+import '../styles/glass.css';
 
 export default function Contribute() {
-    const { user } = useAuth();
-    const [activeTab, setActiveTab] = useState('contribute'); // 'contribute' or 'verify'
+    const { user, userProfile } = useAuth();
+    const [activeTab, setActiveTab] = useState('contribute');
 
     // Protect route naturally
     if (!user) {
         return <Navigate to="/login" replace />;
     }
 
+    const isElderOrHigher = !!userProfile; // Open verification to everyone
+
     return (
         <div className="page-container">
             <div className="container" style={{ paddingBottom: '120px' }}>
-                <h1 className="serif" style={{ marginBottom: '24px', fontSize: '2rem', color: 'var(--color-primary)' }}>Community</h1>
-
-                {/* Framer Motion Spring Animated Toggle UI */}
-                <div className="glass-panel" style={{
-                    display: 'flex',
-                    position: 'relative',
-                    borderRadius: '24px',
-                    padding: '6px',
-                    marginBottom: '32px',
-                    background: 'rgba(255, 255, 255, 0.05)',
-                    boxShadow: 'inset 0 2px 10px rgba(0,0,0,0.2)'
-                }}>
-                    <motion.div
-                        layoutId="activeTabIndicator"
-                        style={{
-                            position: 'absolute',
-                            top: 6,
-                            bottom: 6,
-                            left: activeTab === 'contribute' ? 6 : '50%',
-                            right: activeTab === 'verify' ? 6 : '50%',
-                            borderRadius: '18px',
-                            background: 'var(--color-surface)',
-                            border: '1px solid rgba(255, 255, 255, 0.1)',
-                            zIndex: 0
-                        }}
-                        transition={{ type: "spring", stiffness: 350, damping: 25 }}
-                    />
-
-                    <button
-                        onClick={() => setActiveTab('contribute')}
-                        style={{
-                            flex: 1,
-                            padding: '12px',
-                            zIndex: 1,
-                            color: activeTab === 'contribute' ? 'var(--color-text)' : 'var(--color-text-light)',
-                            fontWeight: activeTab === 'contribute' ? '600' : '500',
-                            border: 'none',
-                            background: 'transparent',
-                            cursor: 'pointer',
-                            transition: 'color 0.2s',
-                            fontSize: '0.95rem'
-                        }}>
-                        Contribute Word
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('verify')}
-                        style={{
-                            flex: 1,
-                            padding: '12px',
-                            zIndex: 1,
-                            color: activeTab === 'verify' ? 'var(--color-text)' : 'var(--color-text-light)',
-                            fontWeight: activeTab === 'verify' ? '600' : '500',
-                            border: 'none',
-                            background: 'transparent',
-                            cursor: 'pointer',
-                            transition: 'color 0.2s',
-                            fontSize: '0.95rem'
-                        }}>
-                        Verify Pending
-                    </button>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                    <h1 className="serif" style={{ fontSize: '2rem', color: 'var(--color-primary)', margin: 0 }}>Contribute</h1>
                 </div>
 
-                {activeTab === 'contribute' ? <ContributeForm /> : <ReviewQueue />}
+                {/* Header / Tabs */}
+                {isElderOrHigher && (
+                    <div style={{ display: 'flex', marginBottom: '32px', background: 'rgba(255,255,255,0.03)', padding: '4px', borderRadius: '16px' }}>
+                        <button
+                            onClick={() => setActiveTab('contribute')}
+                            style={{
+                                flex: 1,
+                                padding: '12px',
+                                background: activeTab === 'contribute' ? 'var(--color-surface)' : 'transparent',
+                                border: 'none',
+                                borderRadius: '12px',
+                                color: activeTab === 'contribute' ? 'var(--color-primary)' : 'var(--color-text-light)',
+                                fontWeight: activeTab === 'contribute' ? 'bold' : 'normal',
+                                transition: 'all 0.2s',
+                                cursor: 'pointer',
+                                fontSize: '1rem'
+                            }}
+                        >
+                            Contribute
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('verify')}
+                            style={{
+                                flex: 1,
+                                padding: '12px',
+                                background: activeTab === 'verify' ? 'var(--color-surface)' : 'transparent',
+                                border: 'none',
+                                borderRadius: '12px',
+                                color: activeTab === 'verify' ? 'var(--color-primary)' : 'var(--color-text-light)',
+                                fontWeight: activeTab === 'verify' ? 'bold' : 'normal',
+                                transition: 'all 0.2s',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '8px',
+                                fontSize: '1rem'
+                            }}
+                        >
+                            Verify
+                        </button>
+                    </div>
+                )}
+
+                {activeTab === 'contribute' ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+                        {/* Guided Contribution Widget */}
+                        <section>
+                            <h2 className="serif" style={{ fontSize: '1.2rem', color: 'var(--color-text)', marginBottom: '16px' }}>Help Translate</h2>
+                            <GuidedContributionWidget />
+                        </section>
+
+                        {/* Custom Word Submission */}
+                        <section>
+                            <h2 className="serif" style={{ fontSize: '1.2rem', color: 'var(--color-text)', marginBottom: '16px' }}>Add a Missing Word</h2>
+                            <div className="glass-panel" style={{ padding: '24px', borderRadius: '24px' }}>
+                                <ContributeForm />
+                            </div>
+                        </section>
+                    </div>
+                ) : (
+                    <section>
+                        <ActionWidget />
+                    </section>
+                )}
             </div>
         </div>
     );

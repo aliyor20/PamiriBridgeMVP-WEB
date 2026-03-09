@@ -103,13 +103,18 @@ export async function voteOnEntry(entryId, voterId, isApproved) {
                 throw new Error("Entry does not exist!");
             }
 
+            // Read user doc BEFORE any writes to satisfy Firestore transaction rules
+            const userDoc = await transaction.get(userRef);
+
             const data = entryDoc.data();
             if (data.voters && data.voters.includes(voterId)) {
                 throw new Error("User has already voted on this entry.");
             }
 
-            const newUpvotes = data.upvotes + (isApproved ? 1 : 0);
-            const newDownvotes = data.downvotes + (isApproved ? 0 : 1);
+            const currentUpvotes = typeof data.upvotes === 'number' && !isNaN(data.upvotes) ? data.upvotes : 0;
+            const currentDownvotes = typeof data.downvotes === 'number' && !isNaN(data.downvotes) ? data.downvotes : 0;
+            const newUpvotes = currentUpvotes + (isApproved ? 1 : 0);
+            const newDownvotes = currentDownvotes + (isApproved ? 0 : 1);
 
             // Reached Threshold => Move to Verified
             let newStatus = data.status;
@@ -132,7 +137,6 @@ export async function voteOnEntry(entryId, voterId, isApproved) {
             });
 
             // Reward Voter
-            const userDoc = await transaction.get(userRef);
             if (userDoc.exists()) {
                 const currentKarma = userDoc.data().karma || 0;
                 transaction.update(userRef, { karma: currentKarma + 1 });
@@ -164,3 +168,105 @@ export async function updateUserPoints(userId, pointsToAdd) {
         throw error;
     }
 }
+
+/**
+ * Creates a new edit proposal for a given entry.
+ */
+export async function submitEditProposal({ originalEntryId, originalWord, originalMeaning, suggestedWord, suggestedMeaning, contributorId }) {
+    const newProposalRef = doc(collection(db, 'edit_proposals'));
+    const proposal = {
+        originalEntryId,
+        originalWord,
+        originalMeaning,
+        suggestedWord,
+        suggestedMeaning,
+        suggesterId: contributorId,
+        status: 'pending',
+        votes_for: 0,
+        votes_against: 0,
+        voters: [], // Track who voted
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+    };
+    await setDoc(newProposalRef, proposal);
+    return newProposalRef.id;
+}
+
+/**
+ * Executes a vote transaction for an Edit Proposal (3 vote consensus).
+ */
+export async function voteOnEditProposal(proposalId, voterId, isUpvote) {
+    const proposalRef = doc(db, 'edit_proposals', proposalId);
+
+    return await runTransaction(db, async (transaction) => {
+        const proposalDoc = await transaction.get(proposalRef);
+
+        if (!proposalDoc.exists()) throw new Error("Proposal does not exist!");
+
+        const data = proposalDoc.data();
+        if (data.status !== 'pending') throw new Error("Proposal is already finalized.");
+
+        if (data.voters && data.voters.includes(voterId)) {
+            throw new Error("You have already voted on this proposal.");
+        }
+
+        // Firestore reads must happen before writes
+        const userRef = doc(db, 'users', voterId);
+        const userDoc = await transaction.get(userRef);
+
+        const newVotesFor = isUpvote ? (data.votes_for || 0) + 1 : (data.votes_for || 0);
+        const newVotesAgainst = !isUpvote ? (data.votes_against || 0) + 1 : (data.votes_against || 0);
+        const newVoters = [...(data.voters || []), voterId];
+
+        // 1. APPROVAL THRESHOLD (>= 3 For)
+        if (newVotesFor >= 3) {
+            const entryRef = doc(db, 'entries', data.originalEntryId);
+
+            // Apply edit to original entry
+            transaction.update(entryRef, {
+                word: data.suggestedWord,
+                meaning: data.suggestedMeaning,
+                timestamp: serverTimestamp(), // Update timestamp so Delta Sync picks it up
+                updatedAt: serverTimestamp(),
+                lastEditedBy: voterId
+            });
+
+            // Mark proposal as approved
+            transaction.update(proposalRef, {
+                status: 'approved',
+                votes_for: newVotesFor,
+                voters: newVoters,
+                resolvedAt: serverTimestamp()
+            });
+
+            return 'APPROVED';
+        }
+
+        // 2. REJECTION THRESHOLD (>= 3 Against)
+        if (newVotesAgainst >= 3) {
+            transaction.update(proposalRef, {
+                status: 'rejected',
+                votes_against: newVotesAgainst,
+                voters: newVoters,
+                resolvedAt: serverTimestamp()
+            });
+            return 'REJECTED';
+        }
+
+        // 3. JUST A VOTE
+        transaction.update(proposalRef, {
+            votes_for: newVotesFor,
+            votes_against: newVotesAgainst,
+            voters: newVoters,
+            updatedAt: serverTimestamp()
+        });
+
+        // Award 1 point to the voter
+        if (userDoc.exists()) {
+            transaction.update(userRef, { points: increment(1) });
+        }
+
+        return 'VOTED';
+    });
+}
+
