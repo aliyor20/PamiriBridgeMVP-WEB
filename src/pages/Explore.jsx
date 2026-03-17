@@ -436,6 +436,39 @@ export default function Explore() {
                     opacity: 0.5;
                 }
             `}</style>
+
+            {/* Footer */}
+            <footer style={{
+                marginTop: '6rem',
+                paddingTop: '1.5rem',
+                paddingBottom: '2rem',
+                borderTop: '1px solid rgba(255,255,255,0.08)',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '6px',
+                fontSize: '0.75rem',
+                color: 'rgba(255,255,255,0.55)',
+                letterSpacing: '0.3px'
+            }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ color: '#fff' }}>aliyor</span>
+                    <span style={{ opacity: 0.4 }}>·</span>
+                    <a href="https://instagram.com/aliyor724" target="_blank" rel="noopener noreferrer"
+                       style={{ color: '#fff', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <rect x="2" y="2" width="20" height="20" rx="5" ry="5"/>
+                            <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/>
+                            <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/>
+                        </svg>
+                        @aliyor724
+                    </a>
+                </div>
+                <a href="mailto:pamiribridge.app@gmail.com"
+                   style={{ color: 'rgba(255,255,255,0.7)', textDecoration: 'none', fontSize: '0.7rem' }}>
+                    pamiribridge.app@gmail.com
+                </a>
+            </footer>
         </div>
     );
 }
